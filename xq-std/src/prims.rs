@@ -14,7 +14,7 @@ extern "C" {
     pub(crate) fn combine_and(l:u32, r:u32) -> u32;
     pub(crate) fn combine_or(l:u32, r:u32) -> u32;
     pub(crate) fn get_parameter_size() -> u32;
-    pub(crate) fn get_parameter_section(param_bytes: *mut u8, length: u32, offset: u32) -> u32;
+    pub(crate) fn get_parameter(param_bytes: *mut u8, length: u32) -> u32;
     pub(crate) fn log_event(start: *const u8, length: u32) -> i32;
     pub(crate) fn load_state(start: *mut u8, length: u32, offset: u32) -> u32;
     pub(crate) fn write_state(start: *const u8, length: u32, offset: u32) -> u32;
@@ -24,6 +24,7 @@ extern "C" {
     pub(crate) fn get_init_origin(start: *mut u8);
     pub(crate) fn get_receive_invoker(start: *mut u8);
     pub(crate) fn get_receive_self_address(start: *mut u8);
+    pub(crate) fn get_receive_self_balance() -> u64;
     pub(crate) fn get_receive_sender(start: *mut u8);
     pub(crate) fn get_receive_owner(start: *mut u8);
 
@@ -39,4 +40,6 @@ extern "C" {
     );
 
     pub(crate) fn wirte_return(start: *const u8, length: u32) -> u32;
+    pub(crate) fn error_set(errorcode: i32) -> i32;
+    pub(crate) fn error_get(errorcode: i32) -> i32;
 }

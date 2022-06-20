@@ -40,3 +40,9 @@ impl<'de> SerdeDeserialize<'de> for Amount{
     }
 }
 
+
+pub struct Cursor<T> {
+    pub offset: usize,
+    pub data: T,
+}
+

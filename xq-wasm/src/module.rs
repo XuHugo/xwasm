@@ -1,8 +1,8 @@
 
 
 
-const MAGIC_NUMBER: i32 = 0x6D736100;
-const VERSION: i32 = 0x00000001;
+const MAGIC_NUMBER: u32 = 0x6D736100;
+const VERSION: u32 = 0x00000001;
 
 pub enum SectionID {
     SecCustomID = 0,
@@ -59,14 +59,14 @@ pub struct Module {
 }
 
 #[derive(Debug)]
-pub struct CustomSection<'a> {
-    pub name:     Name,
-    pub contents: &'a [u8],
+pub struct CustomSection {
+    pub name:     String,
+    pub contents: Vec<u8>,
 }
 
 #[derive(Debug, Default)]
 pub struct TypeSection{
-    pub types:Vec<Rc<FunctionType>>
+    pub types:Vec<FunctionType>
 }
 
 #[derive(Debug, Default)]
@@ -76,8 +76,8 @@ pub struct ImportSection{
 
 #[derive(Debug)]
 pub struct Import {
-    pub mod_name:    String,
-    pub item_name:   String,
+    pub module:    String,
+    pub name:   String,
     pub description: ImportDescription,
 }
 
@@ -87,7 +87,7 @@ pub struct  ImportDescription {
     pub func: TypeIndex,
     pub table: TableType,
     pub mem: MemoryType,
-    pub global: Global,
+    pub global: GlobalType,
 }
 
 
@@ -131,7 +131,7 @@ pub struct  ExportDescription {
 
 #[derive(Debug, Default)]
 pub struct StartSection {
-    pub start:
+    pub start: FuncIndex
 }
 
 #[derive(Debug, Default)]
@@ -143,6 +143,8 @@ pub struct ElementSection {
 pub struct CodeSection {
     pub impls: Vec<Code>,
 }
+
+
 
 #[derive(Debug, Default)]
 pub struct DataSection {

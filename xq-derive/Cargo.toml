@@ -10,9 +10,8 @@ syn = { version = "1.0.63", features = [ "full", "extra-traits" ] }
 quote = "=1.0.0"
 proc-macro2 = "1.0"
 
-[dependencies.xq-common]
-path = "../xq-common"
-default-features = false
+[dependencies.xq-std]
+path = "../xq-std"
 
 [lib]
 proc-macro = true
