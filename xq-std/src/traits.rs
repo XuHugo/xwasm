@@ -1,5 +1,5 @@
 use crate::types::Address;
-use serde::{Deserialize, Serialize};
+//use serde::{Deserialize, Serialize};
 
 pub trait InitContext{
 
@@ -11,6 +11,9 @@ pub trait InitContext{
     
     fn go(self)->i32;
     fn paramteter<T:>(self)-> T where T: serde::de::DeserializeOwned;
+
+    fn state_get()->String;
+    fn state_set(state:String);
 
     fn error_set(self, err_code:i32);
     fn error_get(self);

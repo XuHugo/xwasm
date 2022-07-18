@@ -96,6 +96,16 @@ impl InitContext for InitContractContext{
     fn error_get(self){
         todo!()
     }
+
+    fn state_get()->String{
+        //state_get() -> u32;
+        String::new()
+    }
+    fn state_set(state:String){
+        //state_set(ptr: *mut u8, length: u32) -> u32;
+        todo!()
+    }
+
 }
 
 impl ExecContext for ExecContractContext{

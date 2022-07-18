@@ -146,13 +146,13 @@ fn contains_attribute2(metas:Vec<NestedMeta>, value: &str) -> bool {
 pub fn init(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let attrs = parse_macro_input!(attr as AttributeArgs);
-    eprintln!("attrs2 :{:?}",attrs);
+    eprintln!("init attrs :{:?}",attrs);
 
     let c = get_attribute(attrs.clone(), "contract").unwrap().unwrap();
-    eprintln!("c :{:?}",c);
+    eprintln!("init contract  :{:?}",c);
 
     let pay = contains_attribute2(attrs.clone(), "payable");
-    eprintln!("contains_attrs2 :{:?}",pay);
+    eprintln!("init contains payable :{:?}",pay);
 
     let mut setup_fn_args = proc_macro2::TokenStream::new();
     let mut fn_args = vec![];
@@ -204,7 +204,7 @@ pub fn init(attr: TokenStream, item: TokenStream) -> TokenStream {
     //     Ok(ts) => ts,
     //     Err(e) => e.to_compile_error().into(),
     // }
-    eprintln!("output:{}", output);
+    eprintln!("init  == {}", output);
     TokenStream::from(output)
 }
 
@@ -212,16 +212,16 @@ pub fn init(attr: TokenStream, item: TokenStream) -> TokenStream {
 pub fn call(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let attrs = parse_macro_input!(attr as AttributeArgs);
-    eprintln!("attrs2 :{:?}",attrs);
+    eprintln!("call attrs :{:?}",attrs);
 
     let c = get_attribute(attrs.clone(), "contract").unwrap().unwrap();
-    eprintln!("c :{:?}",c);
+    eprintln!("call contract  :{:?}",c);
 
     let f = get_attribute(attrs.clone(), "func").unwrap().unwrap();
-    eprintln!("f :{:?}",f);
+    eprintln!("call func  :{:?}", f);
 
     let pay = contains_attribute2(attrs.clone(), "payable");
-    eprintln!("contains_attrs2 :{:?}",pay);
+    eprintln!("call contains payable :{:?}",pay);
 
     let mut setup_fn_args = proc_macro2::TokenStream::new();
     let mut fn_args = vec![];
@@ -255,8 +255,9 @@ pub fn call(attr: TokenStream, item: TokenStream) -> TokenStream {
             println!("new call function !");
             use xq_std::{InitContractContext};
             let initctx =  InitContractContext;
+            let state = InitContractContext::state_get();
             #setup_fn_args
-            match #fn_name(initctx, #(#fn_args),*){
+            match #fn_name(initctx, state, #(#fn_args),*){
                 Ok(o)=>{
                     println!{"call ok {:?}", o};
                 }
@@ -267,12 +268,12 @@ pub fn call(attr: TokenStream, item: TokenStream) -> TokenStream {
             0
         }
     };
-    eprintln!("output:{}", output);
+    eprintln!("call == {}", output);
     TokenStream::from(output)
 }
 
 #[proc_macro_derive(Output)]
-pub fn Output_derive(input: TokenStream) -> TokenStream{
+pub fn output_derive(input: TokenStream) -> TokenStream{
     let ast: syn::DeriveInput = syn::parse(input.clone()).unwrap();
     let enum_ident = ast.clone().ident;
     let enum_data = match &ast.data {
@@ -306,7 +307,7 @@ pub fn Output_derive(input: TokenStream) -> TokenStream{
 }
 
 #[proc_macro_attribute]
-pub fn state(attr:TokenStream, item:TokenStream) -> TokenStream{
+pub fn state(_attr:TokenStream, item:TokenStream) -> TokenStream{
     let mut output = proc_macro2::TokenStream::new();
     let data_ident = if let Ok(ast) = syn::parse::<syn::ItemStruct>(item.clone()) {
         ast.to_tokens(&mut output);
@@ -319,18 +320,20 @@ pub fn state(attr:TokenStream, item:TokenStream) -> TokenStream{
     };
     
     let impl_state = quote! {
-        impl data_ident {
+        impl #data_ident {
             fn contract_state_set(&mut self,){
-
+                return
             }
     
             fn contract_state_get(&self){
-    
+                return
             }
         }
 
     };
 
     impl_state.to_tokens(&mut output);
+
+    eprintln!("state == {}",output);
     output.into()
 }
