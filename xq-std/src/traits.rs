@@ -15,8 +15,14 @@ pub trait InitContext{
     fn state_get()->String;
     fn state_set(state:String);
 
-    fn error_set(self, err_code:i32);
-    fn error_get(self);
+    fn error_set(err:String);
+    fn error_get()->String;
+
+    fn return_data_set(data:String);
+    fn return_data_get()->String;
+
+    fn store_get(key: String)->String;
+    fn store_set(key: String, value:String)->bool;
 }
 
 pub trait ExecContext{

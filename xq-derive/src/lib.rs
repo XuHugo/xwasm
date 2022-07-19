@@ -189,10 +189,16 @@ pub fn init(attr: TokenStream, item: TokenStream) -> TokenStream {
             #setup_fn_args
             match #fn_name(initctx, #(#fn_args),*){
                 Ok(o)=>{
+                    let r = serde_json::to_string(&o).unwrap();
+                    InitContractContext::return_data_set(r.clone());
                     println!{"init ok {:?}", o};
+                    return 1
                 }
                 Err(e)=>{
-                    println!{"init err{:?}",e.to_string()};
+                    let err = e.to_string();
+                    InitContractContext::error_set(err.clone());
+                    println!{"init err{:?}",err};
+                    return 0
                 }
             }
             0
@@ -259,10 +265,16 @@ pub fn call(attr: TokenStream, item: TokenStream) -> TokenStream {
             #setup_fn_args
             match #fn_name(initctx, state, #(#fn_args),*){
                 Ok(o)=>{
-                    println!{"call ok {:?}", o};
+                    let r = serde_json::to_string(&o).unwrap();
+                    InitContractContext::return_data_set(r.clone());
+                    println!{"call ok {:?}", r};
+                    return 1
                 }
                 Err(e)=>{
-                    println!{"call err{:?}",e.to_string()};
+                    let err = e.to_string();
+                    InitContractContext::error_set(err.clone());
+                    println!{"call err{:?}",err};
+                    return 0
                 }
             }
             0

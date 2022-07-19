@@ -8,7 +8,7 @@ use core::result::Result;
 
 
 #[derive(Serialize, Deserialize, Debug)]
-#[state(contract="xq")]
+//#[state(contract="xq")]
 struct Param{
     name: String,
     age: u64,
@@ -16,7 +16,7 @@ struct Param{
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-#[state(contract="xq")]
+//#[state(contract="xq")]
 struct State{
     name: String,
     age: u64,
@@ -88,8 +88,9 @@ fn main() {
     let x = ContractError::ParseParams.to_string();
     println!("this is macrofn enum string{:?}", x);
     let state = State{name:"xx".to_string(), age:34, number:30};
-    init_xq(5);
-    call_abc(0);
+    let i = init_xq(5);
+    let c = call_abc(0);
+    println!("init:{}   call:{}",i,c);
     let data = r#"
     {
         "name": "XuQiang",

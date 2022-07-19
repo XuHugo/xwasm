@@ -16,7 +16,7 @@ impl InitContext for InitContractContext{
         let mut bytes: MaybeUninit<[u8; 20]> = MaybeUninit::uninit();
         let ptr = bytes.as_mut_ptr();
         let address = unsafe {
-            //get_init_origin(ptr as *mut u8);
+            get_owner(ptr as *mut u8);
             bytes.assume_init()
         };
         address
@@ -26,7 +26,7 @@ impl InitContext for InitContractContext{
         let mut bytes: MaybeUninit<[u8; 20]> = MaybeUninit::uninit();
         let ptr = bytes.as_mut_ptr();
         let address = unsafe {
-            //get_init_origin(ptr as *mut u8);
+            get_invoker(ptr as *mut u8);
             bytes.assume_init()
         };
         address
@@ -36,7 +36,7 @@ impl InitContext for InitContractContext{
         let mut bytes: MaybeUninit<[u8; 20]> = MaybeUninit::uninit();
         let ptr = bytes.as_mut_ptr();
         let address = unsafe {
-            //get_init_origin(ptr as *mut u8);
+            get_sender(ptr as *mut u8);
             bytes.assume_init()
         };
         address
@@ -45,16 +45,15 @@ impl InitContext for InitContractContext{
         let mut bytes: MaybeUninit<[u8; 20]> = MaybeUninit::uninit();
         let ptr = bytes.as_mut_ptr();
         let address = unsafe {
-            //get_init_origin(ptr as *mut u8);
+            get_self_address(ptr as *mut u8);
             bytes.assume_init()
         };
         address
     }
     fn self_balance(&self) -> u64{
         unsafe { 
-            //get_receive_self_balance()
+            get_self_balance()
          }
-         0
     }
 
     fn go(self) ->i32 {
@@ -90,11 +89,28 @@ impl InitContext for InitContractContext{
         
     }
 
-    fn error_set(self, err_code:i32){
-        todo!()
+    fn error_set(err:String){
+        let err_len = err.len();
+        let ptr = err.as_ptr();
+        unsafe { 
+            error_set(ptr, err_len as u32);
+         }
+        println!("error_set {}",err);
     }
-    fn error_get(self){
-        todo!()
+    fn error_get()->String{
+        format!("error_get")
+    }
+
+    fn return_data_set(data:String){
+        let data_len = data.len();
+        let ptr = data.as_ptr();
+        unsafe { 
+            return_data_set(ptr, data_len as u32);
+         }
+        println!("return data set {}",data);
+    }
+    fn return_data_get()->String{
+        format!("return data get")
     }
 
     fn state_get()->String{
@@ -104,6 +120,25 @@ impl InitContext for InitContractContext{
     fn state_set(state:String){
         //state_set(ptr: *mut u8, length: u32) -> u32;
         todo!()
+    }
+    fn store_get(mut key:String)->String{
+        let key_len = key.len();
+        let ptr = key.as_mut_ptr();
+        unsafe { 
+            store_get(ptr, key_len as u32);
+         }
+        format!("store get: {:?}",key)
+    }
+    fn store_set(mut key:String, mut value:String)-> bool{
+        let key_len = key.len();
+        let kptr = key.as_mut_ptr();
+        let value_len = value.len();
+        let vptr = value.as_mut_ptr();
+        let _a =unsafe { 
+            store_set(kptr, key_len as u32, vptr, value_len as u32)
+         };
+        println!("store_set({}=>{})",key, value);
+        true
     }
 
 }
