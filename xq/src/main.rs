@@ -1,11 +1,14 @@
 use serde_derive::{Serialize, Deserialize};
 //#![cfg_attr(not(feature = "std"), no_std)]
-use xq_derive::{init,call, Output, state};
+use xq_derive::{init,call, Output};
 use xq_std::*;
-use serde::{Deserialize, Serialize};
+use xq_wasm::*;
+use serde::{Serialize};
 //use serde_json::Result;
 use core::result::Result;
-
+use std::{
+    fs,
+};
 
 #[derive(Serialize, Deserialize, Debug)]
 //#[state(contract="xq")]
@@ -60,10 +63,8 @@ enum ContractError {
 type CResult<T:Serialize> = Result<T, ContractError>;
 
 #[init(contract="xq", payable)]
-fn init<C:InitContext + Copy>(ctx: C, amoun3:u64)->CResult<RetValue>{
+fn init<C:Context + Copy>(ctx: C, amoun3:u64)->CResult<RetValue>{
     println!("this is init ! amount:{:?}", amoun3);
-    let t = ctx.go();
-    println!("this is init ! go:{:?}", t);
     let a:Param = ctx.paramteter();
     println!("this is init !parameter{:?}", a);
     //let ret = RetValue{name:"xx".to_string(), age:22, sex:"man".to_string()};
@@ -72,10 +73,8 @@ fn init<C:InitContext + Copy>(ctx: C, amoun3:u64)->CResult<RetValue>{
     Err(ContractError::ParseParams)
 }
 #[call(contract="xq", func="abc")]
-fn rcv<C:InitContext + Copy>(ctx: C, state: String,)->CResult<RetValue>{
+fn rcv<C:Context + Copy>(ctx: C,)->CResult<RetValue>{
     println!("this is call ! amount:{:?}", 0);
-    let t = ctx.go();
-    println!("this is call ! go:{:?}", t);
     let a:Param = ctx.paramteter();
     println!("this is call !parameter{:?}", a);
     let ret = RetValue{name:"xx".to_string(), age:22, sex:"man".to_string()};
@@ -84,21 +83,24 @@ fn rcv<C:InitContext + Copy>(ctx: C, state: String,)->CResult<RetValue>{
 
 
 fn main() {
-    //println!("Hello, world!");
-    let x = ContractError::ParseParams.to_string();
-    println!("this is macrofn enum string{:?}", x);
-    let state = State{name:"xx".to_string(), age:34, number:30};
-    let i = init_xq(5);
-    let c = call_abc(0);
-    println!("init:{}   call:{}",i,c);
-    let data = r#"
-    {
-        "name": "XuQiang",
-        "age": 18,
-        "sex": "male" 
-    }"#;
+    println!("xq, hello!");
+    // let x = ContractError::ParseParams.to_string();
+    // println!("this is macrofn enum string{:?}", x);
+    // let state = State{name:"xx".to_string(), age:34, number:30};
+    // let i = init_xq(5);
+    // let c = call_abc(0);
+    // println!("init:{}   call:{}",i,c);
+    // let data = r#"
+    // {
+    //     "name": "XuQiang",
+    //     "age": 18,
+    //     "sex": "male" 
+    // }"#;
 
-    let p: Param = serde_json::from_str(data).unwrap();
-    println!("Please call {} at the number {}", p.name, p.sex);
+    // let p: Param = serde_json::from_str(data).unwrap();
+    // println!("Please call {} at the number {}", p.name, p.sex);
 
+    let code = fs::read("./xq_test/hw_rust.wasm").unwrap();
+    //let geeco_buf = geeco.as_slice();
+    parse::decode(code);
 }

@@ -1,4 +1,5 @@
-
+use crate::types::*;
+use crate::instruction::*;
 
 
 const MAGIC_NUMBER: u32 = 0x6D736100;
@@ -18,13 +19,14 @@ pub enum SectionID {
     SecCodeID,
     SecDataID,
 }
+#[derive(Debug)]
 pub enum ImportTag {
     ImportTagFunc,
     ImportTagTable,
     ImportTagMem,
     ImportTagGlobal,
 }
-
+#[derive(Debug)]
 pub enum ExportTag {
     ExportTagFunc,
     ExportTagTable,
@@ -40,22 +42,21 @@ pub type GlobalIndex = u32;
 pub type LocalIndex = u32;
 pub type LabelIndex = u32;
 
-#[derive(Debug)]
 pub struct Module {
-    pub magic: u32,
-    pub version: u32,
-    pub custom: CustomSection,
-    pub types:      TypeSection,
-    pub import:  ImportSection,
-    pub func:    FunctionSection,
-    pub table:   TableSection,
-    pub memory:  MemorySection,
-    pub global:  GlobalSection,
-    pub export:  ExportSection,
-    pub start:   StartSection,
-    pub element: ElementSection,
-    pub code:    CodeSection,
-    pub data:    DataSection,
+    pub magic:    u32,
+    pub version:  u32,
+    pub custom:   Option<Vec<CustomSection>>,
+    pub types:    Option<Vec<TypeSection>>,
+    pub import:   Option<Vec<ImportSection>>,
+    pub function: Option<Vec<FunctionSection>>,
+    pub table:    Option<Vec<TableSection>>,
+    pub memory:   Option<Vec<MemorySection>>,
+    pub global:   Option<Vec<GlobalSection>>,
+    pub export:   Option<Vec<ExportSection>>,
+    pub start:    Option<StartSection>,
+    pub element:  Option<Vec<ElementSection>>,
+    pub code:     Option<Vec<CodeSection>>,
+    pub data:     Option<Vec<DataSection>>,
 }
 
 #[derive(Debug)]
@@ -106,9 +107,9 @@ pub struct MemorySection {
     pub memory_type: Option<MemoryType>,
 }
 
-#[derive(Debug, Default)]
 pub struct GlobalSection {
-    pub globals: Vec<Global>,
+    pub types: GlobalType,
+    pub expr: Box<dyn Expr>,
 }
 
 #[derive(Debug, Default)]
@@ -130,23 +131,27 @@ pub struct  ExportDescription {
 
 
 #[derive(Debug, Default)]
-pub struct StartSection {
-    pub start: FuncIndex
-}
+pub struct StartSection(FuncIndex);
 
-#[derive(Debug, Default)]
 pub struct ElementSection {
-    pub elements: Vec<Element>,
+    pub table: TableIndex,
+    pub offset: Box<dyn Expr>,
+    pub init: Vec<FuncIndex>,
 }
 
-#[derive(Debug, Default)]
 pub struct CodeSection {
-    pub impls: Vec<Code>,
+    pub locals: Vec<Locals>,
+    pub expr: Box<dyn Expr>,
+}
+
+pub struct Locals {
+    pub n:u32,
+    pub types: ValueType,
 }
 
 
-
-#[derive(Debug, Default)]
 pub struct DataSection {
-    pub sections: Vec<Data>,
+    pub mem: MemIndex,
+    pub offset: Box<dyn Expr>,
+    pub init: Vec<u8>,
 }

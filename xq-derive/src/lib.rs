@@ -184,19 +184,19 @@ pub fn init(attr: TokenStream, item: TokenStream) -> TokenStream {
         #ast
         pub extern "C" fn #init_fn_name(amount:u64)->i32{
             println!("new init function !");
-            use xq_std::{InitContractContext};
-            let initctx =  InitContractContext;
+            use xq_std::{ContractContext};
+            let initctx =  ContractContext;
             #setup_fn_args
             match #fn_name(initctx, #(#fn_args),*){
                 Ok(o)=>{
                     let r = serde_json::to_string(&o).unwrap();
-                    InitContractContext::return_data_set(r.clone());
+                    ContractContext.return_data(r.clone());
                     println!{"init ok {:?}", o};
                     return 1
                 }
                 Err(e)=>{
                     let err = e.to_string();
-                    InitContractContext::error_set(err.clone());
+                    ContractContext.error(err.clone());
                     println!{"init err{:?}",err};
                     return 0
                 }
@@ -259,20 +259,20 @@ pub fn call(attr: TokenStream, item: TokenStream) -> TokenStream {
         #ast
         pub extern "C" fn #call_fn_name(amount:u64)->i32{
             println!("new call function !");
-            use xq_std::{InitContractContext};
-            let initctx =  InitContractContext;
-            let state = InitContractContext::state_get();
+            use xq_std::{ContractContext};
+            let initctx =  ContractContext;
+            //let state = ContractContext.state_get();
             #setup_fn_args
-            match #fn_name(initctx, state, #(#fn_args),*){
+            match #fn_name(initctx, #(#fn_args),*){
                 Ok(o)=>{
                     let r = serde_json::to_string(&o).unwrap();
-                    InitContractContext::return_data_set(r.clone());
+                    ContractContext.return_data(r.clone());
                     println!{"call ok {:?}", r};
                     return 1
                 }
                 Err(e)=>{
                     let err = e.to_string();
-                    InitContractContext::error_set(err.clone());
+                    ContractContext.error(err.clone());
                     println!{"call err{:?}",err};
                     return 0
                 }
