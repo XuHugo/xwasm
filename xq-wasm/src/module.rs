@@ -99,12 +99,12 @@ pub struct FunctionSection {
 
 #[derive(Debug, Default)]
 pub struct TableSection {
-    pub table_type: Option<TableType>,
+    pub table_type: Vec<TableType>,
 }
 
 #[derive(Debug, Default)]
 pub struct MemorySection {
-    pub memory_type: Option<MemoryType>,
+    pub memory_type: Vec<MemoryType>,
 }
 
 pub struct GlobalSection {
