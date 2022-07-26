@@ -5,8 +5,8 @@ use std::{
 use anyhow::{bail, ensure, Result, Ok};
 
 use crate::{
-    types::{FunctionType, FUNC_TAG, ValueType, TableType, Limits, MemoryType, GlobalType}, 
-    module::{TypeSection,FunctionSection,TableSection, MemorySection, GlobalSection}
+    types::{FunctionType, FUNC_TAG, ValueType, TableType, Limits, MemoryType, GlobalType, EmptyExpr}, 
+    module::{TypeSection,FunctionSection,TableSection, MemorySection, GlobalSection, Global, ExportSection, Export}
 };
 
 pub const MAGIC: [u8; 4] = [0x00, 0x61, 0x73, 0x6D];
@@ -177,6 +177,39 @@ impl Decode for MemoryType{
 
 impl Decode for GlobalType{
     fn decode(cursor: &mut Cursor<Vec<u8>>)->Result<Self>{
+        let init = ValueType::decode(cursor).unwrap();
+        let mutable = u8::decode(cursor).unwrap();
+        Ok(GlobalType{
+            init,
+            mutable,
+        })
+    }
+}
+
+impl Decode for Global{
+    fn decode(cursor: &mut Cursor<Vec<u8>>)->Result<Self> {
+        let types = GlobalType::decode(cursor).unwrap();
+        println!("types:{:?}",types.clone());
+        let expr = EmptyExpr::decode(cursor).unwrap();
+        Ok(Global{
+            types,
+            expr:Box::new(expr),
+        })
+    }
+}
+
+impl Decode for EmptyExpr{
+    fn decode(cursor: &mut Cursor<Vec<u8>>)->Result<Self> {
+        let mut buf = [0u8; 1];
+        while buf[0] !=  0x0b{
+            cursor.read_exact(&mut buf)?;
+        }
+        Ok(EmptyExpr)
+    }
+}
+
+impl Decode for Export{
+    fn decode(cursor: &mut Cursor<Vec<u8>>)->Result<Self> {
         
     }
 }
@@ -229,10 +262,18 @@ fn decode_global(cursor: &mut Cursor<Vec<u8>>)->Result<GlobalSection>{
     println!("#decode_global:");
     let byte_count = u32::decode(cursor).unwrap();
     println!("byte_count: {}", byte_count);
-
+    let globals = Vec::<Global>::decode(cursor).unwrap();
+    
+    Ok(GlobalSection{
+        globals
+    })
 }
-fn decode_export(cursor: &mut Cursor<Vec<u8>>) {
-    println!("decode_export~");
+fn decode_export(cursor: &mut Cursor<Vec<u8>>) -> Result<ExportSection>{
+    println!("#decode_export:");
+    let byte_count = u32::decode(cursor).unwrap();
+    println!("byte_count: {}", byte_count);
+    let exports = Vec::<Export>::decode(cursor).unwrap();
+    Ok(ExportSection{exports})
 }
 fn decode_start(cursor: &mut Cursor<Vec<u8>>) {
     println!("decode_start~");

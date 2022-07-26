@@ -108,6 +108,10 @@ pub struct MemorySection {
 }
 
 pub struct GlobalSection {
+    pub globals: Vec<Global>
+}
+
+pub struct Global {
     pub types: GlobalType,
     pub expr: Box<dyn Expr>,
 }

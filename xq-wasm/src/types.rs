@@ -1,7 +1,8 @@
-use std::convert::TryFrom;
+use std::{convert::TryFrom, io::Empty};
 
 use anyhow::bail;
 
+use crate::instruction::Expr;
 
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -57,9 +58,16 @@ pub struct MemoryType {
     pub limits: Limits,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct GlobalType {
     pub init:    ValueType,
-    pub mutable: bool,
+    pub mutable: u8,
 }
 
+pub struct EmptyExpr;
+
+impl Expr for EmptyExpr{
+    fn new(&self){
+        todo!()
+    }
+}
