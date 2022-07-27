@@ -28,7 +28,7 @@ pub enum ImportTag {
 }
 #[derive(Debug)]
 pub enum ExportTag {
-    ExportTagFunc,
+    ExportTagFunc=0,
     ExportTagTable,
     ExportTagMem,
     ExportTagGlobal,
@@ -135,7 +135,7 @@ pub struct  ExportDescription {
 
 
 #[derive(Debug, Default)]
-pub struct StartSection(FuncIndex);
+pub struct StartSection(pub FuncIndex);
 
 pub struct ElementSection {
     pub table: TableIndex,
