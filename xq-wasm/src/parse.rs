@@ -7,7 +7,7 @@ use anyhow::{bail, ensure, Result, Ok};
 use crate::{
     types::{FunctionType, FUNC_TAG, ValueType, TableType, Limits, MemoryType, GlobalType, EmptyExpr}, 
     module::{TypeSection,FunctionSection,TableSection, MemorySection, GlobalSection, Global, ExportSection, Export, ExportDescription, ExportTag,
-        StartSection, ElementSection, CodeSection, Locals, DataSection}
+        StartSection, ElementSection, CodeSection, Locals, DataSection, ImportSection, Import, ImportDescription, ImportTag, ImportDes}
 };
 
 pub const MAGIC: [u8; 4] = [0x00, 0x61, 0x73, 0x6D];
@@ -46,29 +46,6 @@ pub fn decode(code:Vec<u8>)->ParseResult<()>{
             11 => {decode_data(cursor);},
             id => bail!("Unknown section id {}", id),
         };
-
-        // let section = UnparsedSection::parse(EMPTY_CTX, code)?;
-        // ensure!(
-        //     section.section_id == SectionId::Custom || section.section_id > last_section,
-        //     "Section out of place."
-        // );
-        // if section.section_id != SectionId::Custom {
-        //     last_section = section.section_id
-        // }
-        // match section.section_id {
-        //     SectionId::Custom => custom.push(section),
-        //     SectionId::Type => ty = Some(section),
-        //     SectionId::Import => import = Some(section),
-        //     SectionId::Function => func = Some(section),
-        //     SectionId::Table => table = Some(section),
-        //     SectionId::Memory => memory = Some(section),
-        //     SectionId::Global => global = Some(section),
-        //     SectionId::Export => export = Some(section),
-        //     SectionId::Start => start = Some(section),
-        //     SectionId::Element => element = Some(section),
-        //     SectionId::Code => code = Some(section),
-        //     SectionId::Data => data = Some(section),
-        // }
     }
 
     Ok(())
@@ -311,9 +288,78 @@ impl Decode for DataSection{
     }
 }
 
-fn decode_custom(cursor: &mut Cursor<Vec<u8>>) {
-    println!("decode_custom~");
+impl Decode for ImportTag{
+    fn decode(cursor: &mut Cursor<Vec<u8>>)->Result<Self>{
+        let tag = u8::decode(cursor).unwrap();
+        match tag {
+            0x00 => Ok(ImportTag::ImportTagFunc),
+            0x01 => Ok(ImportTag::ImportTagTable),
+            0x02 => Ok(ImportTag::ImportTagMem),
+            0x03 => Ok(ImportTag::ImportTagGlobal),
+            other => bail!("error import tag {:#x}.", other),
+        }
+    }
+}
 
+impl Decode for ImportDescription{
+    fn decode(cursor: &mut Cursor<Vec<u8>>)->Result<Self>{
+        let tag = ImportTag::decode(cursor).unwrap();
+        let mut importdes = ImportDes::Func(0);
+        match tag{
+            ImportTag::ImportTagFunc =>{
+                let func = u32::decode(cursor).unwrap();
+                importdes = ImportDes::Func(func);
+            },
+            ImportTag::ImportTagTable => {
+                let table = TableType::decode(cursor).unwrap();
+                importdes = ImportDes::Table(table);
+            },
+            ImportTag::ImportTagMem => {
+                let mem = MemoryType::decode(cursor).unwrap();
+                importdes = ImportDes::Mem(mem);
+            },
+            ImportTag::ImportTagGlobal => {
+                let global = GlobalType::decode(cursor).unwrap();
+                importdes = ImportDes::Global(global);
+            },
+        }
+        Ok(ImportDescription{
+            tag,
+            importdes,
+        })
+    }
+}
+
+impl Decode for Import{
+    fn decode(cursor: &mut Cursor<Vec<u8>>)->Result<Self>{
+        let module = String::decode(cursor).unwrap();
+        let name = String::decode(cursor).unwrap();
+        let description = ImportDescription::decode(cursor).unwrap();
+        Ok(Import{
+            module,
+            name,
+            description,
+        })
+    }
+}
+
+// impl Decode for Vec<u8>{
+//     fn decode(cursor: &mut Cursor<Vec<u8>>)->Result<Self>{   
+//         let len = u32::decode(cursor).unwrap();
+//         let start = cursor.position() as usize;
+//         let end = start + len as usize;
+//         cursor.seek(SeekFrom::Current(i64::from(len)))?;
+//         let str = cursor.get_ref()[start..end].to_vec();
+//         Ok(str)
+//     }
+// }
+
+fn decode_custom(cursor: &mut Cursor<Vec<u8>>) {
+    println!("#decode_custom:");
+    let byte_count = Vec::<u8>::decode(cursor).unwrap();
+    // let byte_count = u32::decode(cursor).unwrap();
+    println!("byte_count: {:?}", byte_count);
+    // let name = String::decode(cursor).unwrap();
 }
 fn decode_type(cursor: &mut Cursor<Vec<u8>>) -> Result<TypeSection>{
     println!("#decode_type:");
@@ -328,8 +374,13 @@ fn decode_type(cursor: &mut Cursor<Vec<u8>>) -> Result<TypeSection>{
     }
     Ok(TypeSection{types})
 }
-fn decode_import(cursor: &mut Cursor<Vec<u8>>) {
-    println!("#decode_import~");
+fn decode_import(cursor: &mut Cursor<Vec<u8>>)->Result<ImportSection> {
+    println!("#decode_import:");
+    let byte_count = u32::decode(cursor).unwrap();
+    println!("byte_count: {}", byte_count);
+    let imports = Vec::<Import>::decode(cursor).unwrap();
+    println!("types:{:?}",imports);
+    Ok(ImportSection{imports})
 }
 fn decode_function(cursor: &mut Cursor<Vec<u8>>)->Result<FunctionSection> {
     println!("#decode_function:");

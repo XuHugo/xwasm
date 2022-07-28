@@ -21,7 +21,7 @@ pub enum SectionID {
 }
 #[derive(Debug)]
 pub enum ImportTag {
-    ImportTagFunc,
+    ImportTagFunc=0,
     ImportTagTable,
     ImportTagMem,
     ImportTagGlobal,
@@ -66,7 +66,7 @@ pub struct CustomSection {
 }
 
 #[derive(Debug, Default)]
-pub struct TypeSection{
+pub struct  TypeSection{
     pub types:Vec<FunctionType>
 }
 
@@ -83,12 +83,17 @@ pub struct Import {
 }
 
 #[derive(Debug)]
+pub enum ImportDes{
+    Func(TypeIndex),
+    Table(TableType),
+    Mem(MemoryType),
+    Global(GlobalType),
+}
+
+#[derive(Debug)]
 pub struct  ImportDescription {
     pub tag: ImportTag,
-    pub func: TypeIndex,
-    pub table: TableType,
-    pub mem: MemoryType,
-    pub global: GlobalType,
+    pub importdes: ImportDes,
 }
 
 
