@@ -96,15 +96,15 @@ impl Decode for i64{
 
 impl Decode for f32{
     fn decode(cursor: &mut Cursor<Vec<u8>>)->Result<f32>{
-        let num32 = leb128::read::signed(&mut cursor.take(5))?;
-        Ok(f32::try_from(num32)?)
+        let num64 = leb128::read::signed(&mut cursor.take(5))?;
+        Ok(num64 as f32)
     }
 }
 
 impl Decode for f64{
     fn decode(cursor: &mut Cursor<Vec<u8>>)->Result<f64>{
         let num64 = leb128::read::unsigned(&mut cursor.take(10))?;
-        Ok(num64)
+        Ok(num64 as f64)
     }
 }
 
@@ -204,8 +204,8 @@ impl Decode for GlobalType{
 impl Decode for Global{
     fn decode(cursor: &mut Cursor<Vec<u8>>)->Result<Self> {
         let types = GlobalType::decode(cursor).unwrap();
-        println!("types:{:?}",types.clone());
         let expr = Expr::decode(cursor).unwrap();
+        println!("types:{:?}----{:?}",types.clone(),expr);
         Ok(Global{
             types,
             expr,
@@ -274,7 +274,7 @@ impl Decode for ElementSection{
         let table = u32::decode(cursor).unwrap();
         let offset = Expr::decode(cursor).unwrap();
         let init = Vec::<u32>::decode(cursor).unwrap();
-        println!("types: id:{:?} init:{:?}",table, init);
+        println!("types: id:{:?} offset:{:?} init:{:?}",table, offset, init);
         Ok(ElementSection{
             table,
             offset,
@@ -337,7 +337,8 @@ fn decode_args(opcode:u8, cursor: &mut Cursor<Vec<u8>>)->Args{
             Args::GocalArgs(globalindex)
         },
         OpCode::MemoryGrow | OpCode::MemorySize =>{
-            Args::Zero(0)
+            let t = u8::decode(cursor).unwrap();
+            Args::Zero(t)
         },
         OpCode::I32Const =>{
             let i32const = i32::decode(cursor).unwrap();
@@ -383,7 +384,7 @@ fn decode_instruction(cursor: &mut Cursor<Vec<u8>>) -> Instruction{
 }
 
 fn decode_instructions(cursor: &mut Cursor<Vec<u8>>) -> (Vec<Instruction>,u8){
-    let instrs :Vec<Instruction> = Vec::new();
+    let mut instrs :Vec<Instruction> = Vec::new();
     loop{
         let instr = decode_instruction(cursor);
         if instr.opcode == OpCode::End.into() || instr.opcode == OpCode::Else.into(){
@@ -489,13 +490,16 @@ impl Decode for  Expr {
 impl Decode for CodeSection{
     fn decode(cursor: &mut Cursor<Vec<u8>>)->Result<Self>{
         let byte_count = u32::decode(cursor).unwrap();
-        println!("code byte count:{:?}",byte_count);
-        let start = cursor.position();
+        // let start = cursor.position();
         let locals = Vec::<Locals>::decode(cursor).unwrap();
-        let end = cursor.position();
-        let expr_count = u64::from(byte_count) - (end - start);
-        let expr_bytes = &cursor.get_ref()[end as usize..(end + expr_count) as usize];
-        cursor.set_position(end + expr_count);
+        // let end = cursor.position();
+        // let expr_count = u64::from(byte_count) - (end - start);
+        // let expr_bytes = &cursor.get_ref()[end as usize..(end + expr_count) as usize];
+        // cursor.set_position(end + expr_count);
+        let expr = Expr::decode(cursor).unwrap();
+        println!("code byte count:{:?}",byte_count);
+        println!("code locals:{:?}",locals);
+        println!("code expr:{:?}",expr);
         Ok(CodeSection{
             locals,
             expr,
@@ -508,7 +512,7 @@ impl Decode for DataSection{
         let mem = u32::decode(cursor).unwrap();
         let offset = Expr::decode(cursor).unwrap();
         let init = Vec::<u8>::decode(cursor).unwrap();
-        println!("types: id:{:?} init:{:?}",mem, init);
+        println!("types: id:{:?} offset:{:?} init:{:?}",mem, offset, init);
         Ok(DataSection{
             mem,
             offset,

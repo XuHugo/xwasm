@@ -9,14 +9,16 @@ pub trait Expre {
 
 pub type Expr = Vec<Instruction>;
 
+#[derive(Debug)]
 pub struct Instruction{
     pub opcode: u8,
-    args: Args,
+    pub args: Args,
 }
 
+#[derive(Debug)]
 pub enum Args{
     None,
-    Zero(u32),
+    Zero(u8),
 
     MemArg{
         offset:u32, 

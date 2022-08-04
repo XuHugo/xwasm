@@ -152,7 +152,7 @@ pub struct CodeSection {
     pub locals: Vec<Locals>,
     pub expr: Expr,
 }
-
+#[derive(Debug)]
 pub struct Locals {
     pub n:u32,
     pub types: ValueType,
