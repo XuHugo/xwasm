@@ -1,29 +1,52 @@
 
-use crate::module::LabelIndex;
+use crate::module::{LabelIndex, FuncIndex, TypeIndex, LocalIndex, GlobalIndex};
 
-pub trait Expr {
+pub trait Expre {
     fn new(&self){
         todo!()
     }
 }
 
+pub type Expr = Vec<Instruction>;
+
 pub struct Instruction{
-    opcode: u8,
+    pub opcode: u8,
     args: Args,
 }
 
 pub enum Args{
     None,
-    MemArg,
-    BlockArgs,
-    IfArgs,
-    BrTableArgs,
-    u32,
-    u64,
-    i32,
-    i64,
-    f32,
-    f64,
+    Zero(u32),
+
+    MemArg{
+        offset:u32, 
+        align:u32
+    },
+    BlockArgs{
+        bt:BlockType, 
+        instrs:Vec<Instruction>
+    },
+    IfArgs{
+        bt:BlockType, 
+        instrs1:Vec<Instruction>, 
+        instrs2:Vec<Instruction>
+    }, 
+    BrArgs(LabelIndex),
+    BrTableArgs{
+        labels: Vec<LabelIndex>,
+        default: LabelIndex,
+    },
+    CallArgs(FuncIndex),
+    CallIndirectArgs(TypeIndex),
+
+    LocalArgs(LocalIndex),
+    GocalArgs(GlobalIndex),
+
+    I32ConstArgs(i32),
+    I64ConstArgs(i64),
+    F32ConstArgs(f32),
+    F64ConstArgs(f64),
+    TruncSatArgs(u8),
 }
 
 pub struct MemArg {

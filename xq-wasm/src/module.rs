@@ -118,7 +118,7 @@ pub struct GlobalSection {
 
 pub struct Global {
     pub types: GlobalType,
-    pub expr: Box<dyn Expr>,
+    pub expr: Expr,
 }
 
 #[derive(Debug, Default)]
@@ -144,13 +144,13 @@ pub struct StartSection(pub FuncIndex);
 
 pub struct ElementSection {
     pub table: TableIndex,
-    pub offset: Box<dyn Expr>,
+    pub offset: Expr,
     pub init: Vec<FuncIndex>,
 }
 
 pub struct CodeSection {
     pub locals: Vec<Locals>,
-    pub expr: Box<dyn Expr>,
+    pub expr: Expr,
 }
 
 pub struct Locals {
@@ -161,6 +161,6 @@ pub struct Locals {
 
 pub struct DataSection {
     pub mem: MemIndex,
-    pub offset: Box<dyn Expr>,
+    pub offset: Expr,
     pub init: Vec<u8>,
 }

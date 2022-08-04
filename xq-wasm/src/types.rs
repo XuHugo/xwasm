@@ -2,7 +2,7 @@ use std::{convert::TryFrom, io::Empty};
 
 use anyhow::bail;
 
-use crate::instruction::Expr;
+use crate::instruction::Expre;
 
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -66,7 +66,7 @@ pub struct GlobalType {
 
 pub struct EmptyExpr;
 
-impl Expr for EmptyExpr{
+impl Expre for EmptyExpr{
     fn new(&self){
         todo!()
     }

@@ -3,6 +3,7 @@ pub mod types;
 pub mod module;
 pub mod instruction;
 pub mod parse;
+pub mod opcodes;
 
 
 #[cfg(test)]

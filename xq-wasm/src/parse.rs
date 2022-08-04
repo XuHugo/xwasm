@@ -7,7 +7,9 @@ use anyhow::{bail, ensure, Result, Ok};
 use crate::{
     types::{FunctionType, FUNC_TAG, ValueType, TableType, Limits, MemoryType, GlobalType, EmptyExpr}, 
     module::{TypeSection,FunctionSection,TableSection, MemorySection, GlobalSection, Global, ExportSection, Export, ExportDescription, ExportTag,
-        StartSection, ElementSection, CodeSection, Locals, DataSection, ImportSection, Import, ImportDescription, ImportTag, ImportDes}
+        StartSection, ElementSection, CodeSection, Locals, DataSection, ImportSection, Import, ImportDescription, ImportTag, ImportDes}, 
+    instruction::{Instruction, Args, Expr}, 
+    opcodes::OpCode
 };
 
 pub const MAGIC: [u8; 4] = [0x00, 0x61, 0x73, 0x6D];
@@ -68,6 +70,41 @@ impl Decode for u32{
     fn decode(cursor: &mut Cursor<Vec<u8>>)->Result<u32>{
         let num32 = leb128::read::unsigned(&mut cursor.take(5))?;
         Ok(u32::try_from(num32)?)
+    }
+}
+
+impl Decode for i32{
+    fn decode(cursor: &mut Cursor<Vec<u8>>)->Result<i32>{
+        let num32 = leb128::read::signed(&mut cursor.take(5))?;
+        Ok(i32::try_from(num32)?)
+    }
+}
+
+impl Decode for u64{
+    fn decode(cursor: &mut Cursor<Vec<u8>>)->Result<u64>{
+        let num64 = leb128::read::unsigned(&mut cursor.take(10))?;
+        Ok(num64)
+    }
+}
+
+impl Decode for i64{
+    fn decode(cursor: &mut Cursor<Vec<u8>>)->Result<i64>{
+        let num64 = leb128::read::signed(&mut cursor.take(10))?;
+        Ok(num64)
+    }
+}
+
+impl Decode for f32{
+    fn decode(cursor: &mut Cursor<Vec<u8>>)->Result<f32>{
+        let num32 = leb128::read::signed(&mut cursor.take(5))?;
+        Ok(f32::try_from(num32)?)
+    }
+}
+
+impl Decode for f64{
+    fn decode(cursor: &mut Cursor<Vec<u8>>)->Result<f64>{
+        let num64 = leb128::read::unsigned(&mut cursor.take(10))?;
+        Ok(num64)
     }
 }
 
@@ -168,10 +205,10 @@ impl Decode for Global{
     fn decode(cursor: &mut Cursor<Vec<u8>>)->Result<Self> {
         let types = GlobalType::decode(cursor).unwrap();
         println!("types:{:?}",types.clone());
-        let expr = EmptyExpr::decode(cursor).unwrap();
+        let expr = Expr::decode(cursor).unwrap();
         Ok(Global{
             types,
-            expr:Box::new(expr),
+            expr,
         })
     }
 }
@@ -235,12 +272,12 @@ impl Decode for Export{
 impl Decode for ElementSection{
     fn decode(cursor: &mut Cursor<Vec<u8>>)->Result<Self>{
         let table = u32::decode(cursor).unwrap();
-        let offset = EmptyExpr::decode(cursor).unwrap();
+        let offset = Expr::decode(cursor).unwrap();
         let init = Vec::<u32>::decode(cursor).unwrap();
         println!("types: id:{:?} init:{:?}",table, init);
         Ok(ElementSection{
             table,
-            offset:Box::new(offset),
+            offset,
             init,
         })
     }
@@ -257,6 +294,198 @@ impl Decode for Locals{
     }
 }
 
+fn decode_args(opcode:u8, cursor: &mut Cursor<Vec<u8>>)->Args{
+    match OpCode::try_from(opcode).unwrap(){
+        OpCode::Block | OpCode::Loop =>{
+            let bt = i32::decode(cursor).unwrap();
+            let (instrs, op) = decode_instructions(cursor);
+            Args::BlockArgs { bt, instrs }
+        },
+        OpCode::If =>{
+            let bt = i32::decode(cursor).unwrap();
+            let (instrs1, op) = decode_instructions(cursor);
+            if op == OpCode::Else.into(){
+                let (instrs2, op) = decode_instructions(cursor);
+                Args::IfArgs { bt, instrs1, instrs2}
+            }else{
+                Args::IfArgs { bt, instrs1, instrs2:Vec::new()}
+            }
+        },
+        OpCode::Br | OpCode::BrIf => {
+            let lableindex = u32::decode(cursor).unwrap();
+            Args::BrArgs(lableindex)
+        },
+        OpCode::BrTable =>{
+            let labels = Vec::<u32>::decode(cursor).unwrap();
+            let default = u32::decode(cursor).unwrap();
+            Args::BrTableArgs { labels, default }
+        },
+        OpCode::Call => {
+            let funcindex = u32::decode(cursor).unwrap();
+            Args::CallArgs(funcindex)
+        },
+        OpCode::CallIndirect => {
+            let typeindex = u32::decode(cursor).unwrap();
+            Args::CallIndirectArgs(typeindex)
+        },
+        OpCode::LocalGet | OpCode::LocalSet | OpCode::LocalTee =>{
+            let localindex = u32::decode(cursor).unwrap();
+            Args::LocalArgs(localindex)
+        },
+        OpCode::GlobalGet | OpCode::GlobalSet =>{
+            let globalindex = u32::decode(cursor).unwrap();
+            Args::GocalArgs(globalindex)
+        },
+        OpCode::MemoryGrow | OpCode::MemorySize =>{
+            Args::Zero(0)
+        },
+        OpCode::I32Const =>{
+            let i32const = i32::decode(cursor).unwrap();
+            Args::I32ConstArgs(i32const)
+        },
+        OpCode::I64Const =>{
+            let i64const = i64::decode(cursor).unwrap();
+            Args::I64ConstArgs(i64const)
+        },
+        OpCode::F32Const =>{
+            let f32const = f32::decode(cursor).unwrap();
+            Args::F32ConstArgs(f32const)
+        },
+        OpCode::F64Const =>{
+            let f64const = f64::decode(cursor).unwrap();
+            Args::F64ConstArgs(f64const)
+        },
+        OpCode::TruncSat =>{
+            let t = u8::decode(cursor).unwrap();
+            Args::TruncSatArgs(t)
+        },
+
+        _ if opcode >= OpCode::I32Load.into() && opcode <= OpCode::I64Store32.into() =>{
+            let offset = u32::decode(cursor).unwrap();
+            let align = u32::decode(cursor).unwrap();
+            Args::MemArg { offset, align }
+        },
+
+        _ => {
+            Args::None
+        },
+    }
+}
+
+
+fn decode_instruction(cursor: &mut Cursor<Vec<u8>>) -> Instruction{
+    let opcode = u8::decode(cursor).unwrap();
+    let args = decode_args(opcode, cursor);
+    Instruction{
+        opcode,
+        args,
+    }
+}
+
+fn decode_instructions(cursor: &mut Cursor<Vec<u8>>) -> (Vec<Instruction>,u8){
+    let instrs :Vec<Instruction> = Vec::new();
+    loop{
+        let instr = decode_instruction(cursor);
+        if instr.opcode == OpCode::End.into() || instr.opcode == OpCode::Else.into(){
+            return (instrs, instr.opcode)
+        }
+        instrs.push(instr);
+    }
+    
+}
+
+
+// impl Decode for  Instruction {
+//     fn decode(cursor: &mut Cursor<Vec<u8>>)->Result<Self>{
+
+//         let opcode = u8::decode(cursor).unwrap();
+//         let args = 
+//         match OpCode::try_from(opcode).unwrap(){
+//             OpCode::Block | OpCode::Loop =>{
+//                 let bt = i32::decode(cursor).unwrap();
+//                 let instrs = Vec::<Instruction>::decode(cursor).unwrap();
+//                 Args::BlockArgs { bt, instrs }
+//             },
+//             OpCode::If =>{
+//                 let bt = i32::decode(cursor).unwrap();
+//                 let instrs1 = Vec::<Instruction>::decode(cursor).unwrap();
+//                 let instrs2 = Vec::<Instruction>::decode(cursor).unwrap();
+//                 Args::IfArgs { bt, instrs1, instrs2}
+//             },
+//             OpCode::Br | OpCode::BrIf => {
+//                 let lableindex = u32::decode(cursor).unwrap();
+//                 Args::BrArgs(lableindex)
+//             },
+//             OpCode::BrTable =>{
+//                 let labels = Vec::<u32>::decode(cursor).unwrap();
+//                 let default = u32::decode(cursor).unwrap();
+//                 Args::BrTableArgs { labels, default }
+//             },
+//             OpCode::Call => {
+//                 let funcindex = u32::decode(cursor).unwrap();
+//                 Args::CallArgs(funcindex)
+//             },
+//             OpCode::CallIndirect => {
+//                 let typeindex = u32::decode(cursor).unwrap();
+//                 Args::CallIndirectArgs(typeindex)
+//             },
+//             OpCode::LocalGet | OpCode::LocalSet | OpCode::LocalTee =>{
+//                 let localindex = u32::decode(cursor).unwrap();
+//                 Args::LocalArgs(localindex)
+//             },
+//             OpCode::GlobalGet | OpCode::GlobalSet =>{
+//                 let globalindex = u32::decode(cursor).unwrap();
+//                 Args::GocalArgs(globalindex)
+//             },
+//             OpCode::MemoryGrow | OpCode::MemorySize =>{
+//                 Args::Zero(0)
+//             },
+//             OpCode::I32Const =>{
+//                 let i32const = i32::decode(cursor).unwrap();
+//                 Args::I32ConstArgs(i32const)
+//             },
+//             OpCode::I64Const =>{
+//                 let i64const = i64::decode(cursor).unwrap();
+//                 Args::I64ConstArgs(i64const)
+//             },
+//             OpCode::F32Const =>{
+//                 let f32const = f32::decode(cursor).unwrap();
+//                 Args::F32ConstArgs(f32const)
+//             },
+//             OpCode::F64Const =>{
+//                 let f64const = f64::decode(cursor).unwrap();
+//                 Args::F64ConstArgs(f64const)
+//             },
+//             OpCode::TruncSat =>{
+//                 let t = u8::decode(cursor).unwrap();
+//                 Args::TruncSatArgs(t)
+//             },
+
+//             _ if opcode >= OpCode::I32Load.into() && opcode <= OpCode::I64Store32.into() =>{
+//                 let offset = u32::decode(cursor).unwrap();
+//                 let align = u32::decode(cursor).unwrap();
+//                 Args::MemArg { offset, align }
+//             },
+
+//             _ => {
+//                 Args::None
+//             },
+//         };
+        
+//         Ok(Instruction{
+//             opcode,
+//             args,
+//         })
+//     }
+// }
+
+impl Decode for  Expr {
+    fn decode(cursor: &mut Cursor<Vec<u8>>)->Result<Self>{
+        let (expr, op) = decode_instructions(cursor);
+        Ok(expr)
+    }
+}
+
 impl Decode for CodeSection{
     fn decode(cursor: &mut Cursor<Vec<u8>>)->Result<Self>{
         let byte_count = u32::decode(cursor).unwrap();
@@ -269,7 +498,7 @@ impl Decode for CodeSection{
         cursor.set_position(end + expr_count);
         Ok(CodeSection{
             locals,
-            expr:Box::new(EmptyExpr),
+            expr,
         })
     }
 }
@@ -277,12 +506,12 @@ impl Decode for CodeSection{
 impl Decode for DataSection{
     fn decode(cursor: &mut Cursor<Vec<u8>>)->Result<Self>{
         let mem = u32::decode(cursor).unwrap();
-        let offset = EmptyExpr::decode(cursor).unwrap();
+        let offset = Expr::decode(cursor).unwrap();
         let init = Vec::<u8>::decode(cursor).unwrap();
         println!("types: id:{:?} init:{:?}",mem, init);
         Ok(DataSection{
             mem,
-            offset:Box::new(offset),
+            offset,
             init,
         })
     }
