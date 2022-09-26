@@ -7,7 +7,7 @@ use anyhow::{bail, ensure, Result, Ok};
 use crate::{
     types::{FunctionType, FUNC_TAG, ValueType, TableType, Limits, MemoryType, GlobalType, EmptyExpr}, 
     module::{TypeSection,FunctionSection,TableSection, MemorySection, GlobalSection, Global, ExportSection, Export, ExportDescription, ExportTag,
-        StartSection, ElementSection, CodeSection, Locals, DataSection, ImportSection, Import, ImportDescription, ImportTag, ImportDes}, 
+        StartSection, ElementSection, CodeSection, Locals, DataSection, ImportSection, Import, ImportDescription, ImportTag, ImportDes, Module}, 
     instruction::{Instruction, Args, Expr}, 
     opcodes::OpCode
 };
@@ -19,37 +19,76 @@ pub type ParseResult<A> = anyhow::Result<A>;
 
 pub fn decode(code:Vec<u8>)->ParseResult<()>{
     let len = code.len() as u64;
+    let mut module = Module::default();
     let cursor = &mut Cursor::new(code);
     {
         let mut buf = [0u8; 4];
         cursor.read_exact(&mut buf)?;
         ensure!(buf == MAGIC, "error magic !");
+        module.set_magic(buf);
         cursor.read_exact(&mut buf)?;
         ensure!(buf == VERSION, "error version !");
+        module.set_version(buf);
     }
     println!("len = {}", len);
-
     while cursor.position() < len  {
         let mut buf = [0u8; 1];
         cursor.read_exact(&mut buf)?;
         println!("secid={}",buf[0]);
         match buf[0] {
-            0 => decode_custom(cursor),
-            1 => {decode_type(cursor);},
-            2 => {decode_import(cursor);},
-            3 => {decode_function(cursor);},
-            4 => {decode_table(cursor);},
-            5 => {decode_memory(cursor);},
-            6 => {decode_global(cursor);},
-            7 => {decode_export(cursor);},
-            8 => {decode_start(cursor);},
-            9 => {decode_element(cursor);},
-            10 => {decode_code(cursor);},
-            11 => {decode_data(cursor);},
+            0 => {
+                decode_custom(cursor);
+                module.set_custom(None);
+            },
+            1 => {
+                let types = decode_type(cursor).unwrap();
+                module.set_types(Some(types));
+            },
+            2 => {
+                let import = decode_import(cursor).unwrap();
+                module.set_import(Some(import));
+            },
+            3 => {
+                let function = decode_function(cursor).unwrap();
+                module.set_function(Some(function));
+            },
+            4 => {
+                let table = decode_table(cursor).unwrap();
+                module.set_table(Some(table));
+            },
+            5 => {
+                let memory = decode_memory(cursor).unwrap();
+                module.set_memory(Some(memory));
+            },
+            6 => {
+                let global = decode_global(cursor).unwrap();
+                module.set_global(Some(global));
+            },
+            7 => {
+                let export = decode_export(cursor).unwrap();
+                module.set_export(Some(export));
+            },
+            8 => {
+                let start = decode_start(cursor).unwrap();
+                module.set_start(Some(start));
+            },
+            9 => {
+                let element = decode_element(cursor).unwrap();
+                module.set_element(Some(element));
+            },
+            10 => {
+                let code = decode_code(cursor).unwrap();
+                module.set_code(Some(code));
+            },
+            11 => {
+                let data = decode_data(cursor).unwrap();
+                module.set_data(Some(data));
+            },
             id => bail!("Unknown section id {}", id),
         };
     }
 
+    //println!("!!!!!!!!!!!!!!!!{:#?}", module);
     Ok(())
 
 }
