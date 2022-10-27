@@ -26,7 +26,7 @@ pub enum ImportTag {
     ImportTagMem,
     ImportTagGlobal,
 }
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ExportTag {
     ExportTagFunc=0,
     ExportTagTable,
@@ -103,6 +103,33 @@ impl  Module {
     pub fn set_data(&mut self, data:Option<Vec<DataSection>>){
         self.data=data;
     }
+
+    pub fn invoke_export(&self, func_name: &str)->Result<(),()>{
+        match self.export{
+            Some(ref e)=>{
+                for i in e.exports.clone(){
+                    if i.name == func_name{
+                        if i.description.tag == ExportTag::ExportTagFunc{
+                            let f = self.code.as_ref().unwrap();
+                            let fi = &f[i.description.index as usize];
+                            println!("codesection:{:?}", fi);
+                        }else{
+                            println!("invoke name: {} not function",i.name);
+                            return Err(())
+                        }
+                        println!("invoke name: {}",i.name);
+                        return Ok(())
+                    }
+                }
+            },
+            None=>{
+                println!("cant find export !!");
+                return Err(())
+            }
+        };
+        println!("cant find invoke name!!");
+        return Err(())
+    }
 }
 
 #[derive(Debug)]
@@ -168,18 +195,18 @@ pub struct Global {
     pub expr: Expr,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct ExportSection {
     pub exports: Vec<Export>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Export {
     pub name:        String,
     pub description: ExportDescription,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct  ExportDescription {
     pub tag: ExportTag,
     pub index: u32,
@@ -194,12 +221,12 @@ pub struct ElementSection {
     pub offset: Expr,
     pub init: Vec<FuncIndex>,
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CodeSection {
     pub locals: Vec<Locals>,
     pub expr: Expr,
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Locals {
     pub n:u32,
     pub types: ValueType,

@@ -102,5 +102,31 @@ fn main() {
 
     let code = fs::read("./xq_test/hw_rust.wasm").unwrap();
     //let geeco_buf = geeco.as_slice();
-    parse::decode(code);
+    match parse::DecodeBinary(code){
+        Ok(m)=>{
+            println!("{:#?}",m.magic);
+            println!("{:#?}",m.version);
+            println!("{:#?}",m.custom);
+            println!("{:#?}",m.types);
+            println!("{:#?}",m.import);
+            println!("{:#?}",m.function);
+            println!("{:#?}",m.table);
+            println!("{:#?}",m.memory);
+            println!("{:#?}",m.global);
+            println!("{:#?}",m.export);
+            println!("{:#?}",m.start);
+            //println!("{:?}",m.element);
+            //println!("{:?}",m.code);
+            //println!("{:?}",m.data);
+            match m.invoke_export("main"){
+                Ok(_o)=>{
+                    println!("invoke ok!!");
+                },
+                Err(_e)=>{
+                    println!("invoke error!!");
+                },
+            };
+        },
+        Err(_e)=>println!("parse module error!"),
+    };
 }

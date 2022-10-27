@@ -1,11 +1,11 @@
-use crate::{module::Module, instruction::Expr, opcodes::OpCode};
+use crate::{module::Module, instruction::{Expr, Args}, opcodes::OpCode};
 use num_enum::TryFromPrimitive;
-use std::convert::TryFrom;
+use std::{convert::{TryFrom, TryInto}, ops::{Neg, BitAnd, BitOr, BitXor, Shl, Shr}};
 
 
 
 #[derive(Copy, Clone)]
-pub union StackValue {
+pub union StackValue2 {
     pub i32_: i32,
     pub i64_: i64,
     pub u32_: u32,
@@ -14,53 +14,150 @@ pub union StackValue {
     pub f64_: f64,
 }
 
-impl From<i32> for StackValue {
-    fn from(i32_: i32) -> Self {
-        Self {
-            i32_,
-        }
-    }
+
+#[derive(Copy, Clone, PartialEq, PartialOrd)]
+pub enum StackValue {
+    I32(i32),
+    I64(i64),
+    F32(f32),
+    F64(f64),
 }
 
-impl From<u32> for StackValue {
-    fn from(u32_: u32) -> Self {
-        Self {
-            u32_,
-        }
+impl From<i8> for StackValue {
+	fn from(val: i8) -> Self {
+		StackValue::I32(val as i32)
+	}
+}
+
+impl From<i16> for StackValue {
+	fn from(val: i16) -> Self {
+		StackValue::I32(val as i32)
+	}
+}
+
+impl From<i32> for StackValue {
+    fn from(n: i32) -> Self {
+        StackValue::I32(n)
     }
 }
 
 impl From<i64> for StackValue {
-    fn from(i64_: i64) -> Self {
-        Self {
-            i64_,
-        }
+    fn from(n: i64) -> Self {
+        StackValue::I64(n)
+    }
+}
+
+impl From<u8> for StackValue {
+	fn from(val: u8) -> Self {
+		StackValue::I32(val as i32)
+	}
+}
+
+impl From<u16> for StackValue {
+	fn from(val: u16) -> Self {
+		StackValue::I32(val as i32)
+	}
+}
+
+impl From<u32> for StackValue {
+    fn from(n: u32) -> Self {
+        StackValue::I32(n as i32)
     }
 }
 
 impl From<u64> for StackValue {
-    fn from(u64_: u64) -> Self {
-        Self {
-            u64_,
-        }
+    fn from(n: u64) -> Self {
+        StackValue::I64(n as i64)
     }
 }
 
 impl From<f32> for StackValue {
-    fn from(f32_: f32) -> Self {
-        Self {
-            f32_,
-        }
+    fn from(f: f32) -> Self {
+        StackValue::F32(f)
     }
 }
 
 impl From<f64> for StackValue {
-    fn from(f64_: f64) -> Self {
-        Self {
-            f64_,
+    fn from(f: f64) -> Self {
+        StackValue::F64(f)
+    }
+}
+
+impl From<bool> for StackValue {
+    fn from(b: bool) -> Self {
+        if b {
+            StackValue::I32(1)
+        }else{
+            StackValue::I32(0)
+        }
+        
+    }
+}
+
+
+impl From<StackValue> for i32 {
+    fn from(n: StackValue) -> Self {
+        match n {
+            StackValue::I32(val)=> val,
+            _=> panic!("the conversion from stackvalue to i32 error!"),
         }
     }
 }
+
+impl From<StackValue> for u32 {
+    fn from(n: StackValue) -> Self {
+        match n {
+            StackValue::I32(val)=> val as u32,
+            _=> panic!("the conversion from stackvalue to u32 error!"),
+        }
+    }
+}
+
+impl From<StackValue> for i64 {
+    fn from(n: StackValue) -> Self {
+        match n {
+            StackValue::I64(val)=> val,
+            _=> panic!("the conversion from stackvalue to i64 error!"),
+        }
+    }
+}
+
+impl From<StackValue> for u64 {
+    fn from(n: StackValue) -> Self {
+        match n {
+            StackValue::I64(val)=> val as u64,
+            _=> panic!("the conversion from stackvalue to u64 error!"),
+        }
+    }
+}
+
+impl From<StackValue> for f32 {
+    fn from(n: StackValue) -> Self {
+        match n {
+            StackValue::F32(val)=> val,
+            _=> panic!("the conversion from stackvalue to f32 error!"),
+        }
+    }
+}
+
+impl From<StackValue> for f64 {
+    fn from(n: StackValue) -> Self {
+        match n {
+            StackValue::F64(val)=> val,
+            _=> panic!("the conversion from stackvalue to f64 error!"),
+        }
+    }
+}
+
+impl From<StackValue> for bool {
+    fn from(b: StackValue) -> Self {
+        match b {
+            StackValue::I32(val)=> val !=0,
+            _=> panic!("the conversion from stackvalue to bool error!"),
+        }
+    }
+}
+
 
 pub struct OperandStack{
     stack:Vec<StackValue>,
@@ -81,12 +178,12 @@ impl OperandStack{
     fn push(&mut self, sv:StackValue){
         self.stack.push(sv)
     }
-    unsafe fn popS32(&mut self)->i32{
-        self.pop().i32_
-    }
-
-    unsafe fn popS64(&mut self)->i64{
-        self.pop().i64_
+    fn pop_as<T>(&mut self)->T
+    where
+        T:From<StackValue>
+    {
+        let value = self.pop();
+        value.into()
     }
 }
 
@@ -104,14 +201,25 @@ impl Interpreter{
         }
     }
 
-    pub fn execFunc(){
+    pub fn execFunc(&mut self, idx:usize){
+        match self.module.code{
+            Some(ref mut  c)=>{
+                let code = c[idx].clone();
+                self.execCode(code.expr);
 
+            },
+            None=>{},
+        }
+
+        //self.module.invoke_export(func_name)
     }
 
-    pub fn execCode(instructions: Expr){
+    pub fn execCode(&mut self, instructions: Expr){
         for instruction in instructions.iter(){
             match OpCode::try_from(instruction.opcode).unwrap(){
-                OpCode::Unreachable=>{},
+                OpCode::Unreachable=>{
+                    panic!("unreachable");
+                },
                 OpCode::Nop=>{},
                 OpCode::Block=>{},
                 OpCode::Loop=>{},
@@ -125,181 +233,604 @@ impl Interpreter{
                 OpCode::Call=>{},
                 OpCode::CallIndirect=>{},
 
-    // Parametric instructions
-    OpCode::Drop=>{},
-    OpCode::Select=>{},
+                // Parametric instructions
+                OpCode::Drop=>{
+                    self.operandstack.pop();
+                },
+                OpCode::Select=>{
+                    let right = self.operandstack.pop();
+                    let mid = self.operandstack.pop();
+                    let left = self.operandstack.pop();
 
-    // Variable instructions
-    OpCode::LocalGet=>{},
-    OpCode::LocalSet=>{},
-    OpCode::LocalTee=>{},
-    OpCode::GlobalGet=>{},
-    OpCode::GlobalSet=>{},
+                    let val = if right.into() {left} else {mid};
+                    self.operandstack.push(val);
+                },
 
-    // Memory instructions
-    OpCode::I32Load=>{},
-    OpCode::I64Load =>{},
-    OpCode::F32Load =>{},
-    OpCode::F64Load =>{},
-    OpCode::I32Load8S =>{},
-    OpCode::I32Load8U =>{},
-    OpCode::I32Load16S =>{},
-    OpCode::I32Load16U =>{},
-    OpCode::I64Load8S =>{},
-    OpCode::I64Load8U =>{},
-    OpCode::I64Load16S =>{},
-    OpCode::I64Load16U=>{},
-    OpCode::I64Load32S =>{},
-    OpCode::I64Load32U =>{},
-    OpCode::I32Store =>{},
-    OpCode::I64Store =>{},
-    OpCode::F32Store =>{},
-    OpCode::F64Store =>{},
-    OpCode::I32Store8 =>{},
-    OpCode::I32Store16 =>{},
-    OpCode::I64Store8 =>{},
-    OpCode::I64Store16 =>{},
-    OpCode::I64Store32 =>{},
-    OpCode::MemorySize =>{},
-    OpCode::MemoryGrow =>{},
+                // Variable instructions
+                OpCode::LocalGet=>{},
+                OpCode::LocalSet=>{},
+                OpCode::LocalTee=>{},
+                OpCode::GlobalGet=>{},
+                OpCode::GlobalSet=>{},
 
-    // Numeric instructions
-    OpCode::I32Const =>{},
-    OpCode::I64Const =>{},
-    OpCode::F32Const =>{},
-    OpCode::F64Const =>{},
+                // Memory instructions
+                OpCode::I32Load=>{},
+                OpCode::I64Load =>{},
+                OpCode::F32Load =>{},
+                OpCode::F64Load =>{},
+                OpCode::I32Load8S =>{},
+                OpCode::I32Load8U =>{},
+                OpCode::I32Load16S =>{},
+                OpCode::I32Load16U =>{},
+                OpCode::I64Load8S =>{},
+                OpCode::I64Load8U =>{},
+                OpCode::I64Load16S =>{},
+                OpCode::I64Load16U=>{},
+                OpCode::I64Load32S =>{},
+                OpCode::I64Load32U =>{},
+                OpCode::I32Store =>{},
+                OpCode::I64Store =>{},
+                OpCode::F32Store =>{},
+                OpCode::F64Store =>{},
+                OpCode::I32Store8 =>{},
+                OpCode::I32Store16 =>{},
+                OpCode::I64Store8 =>{},
+                OpCode::I64Store16 =>{},
+                OpCode::I64Store32 =>{},
+                OpCode::MemorySize =>{},
+                OpCode::MemoryGrow =>{},
 
-    OpCode::I32Eqz =>{},
-    OpCode::I32Eq =>{},
-    OpCode::I32Ne =>{},
-    OpCode::I32LtS =>{},
-    OpCode::I32LtU =>{},
-    OpCode::I32GtS =>{},
-    OpCode::I32GtU =>{},
-    OpCode::I32LeS =>{},
-    OpCode::I32LeU =>{},
-    OpCode::I32GeS =>{},
-    OpCode::I32GeU =>{},
-    OpCode::I64Eqz =>{},
-    OpCode::I64Eq =>{},
-    OpCode::I64Ne =>{},
-    OpCode::I64LtS =>{},
-    OpCode::I64LtU =>{},
-    OpCode::I64GtS =>{},
-    OpCode::I64GtU =>{},
-    OpCode::I64LeS =>{},
-    OpCode::I64LeU =>{},
-    OpCode::I64GeS =>{},
-    OpCode::I64GeU =>{},
-    OpCode::F32Eq =>{},
-    OpCode::F32Ne =>{},
-    OpCode::F32Lt =>{},
-    OpCode::F32Gt =>{},
-    OpCode::F32Le =>{},
-    OpCode::F32Ge =>{},
-    OpCode::F64Eq =>{},
-    OpCode::F64Ne =>{},
-    OpCode::F64Lt =>{},
-    OpCode::F64Gt =>{},
-    OpCode::F64Le =>{},
-    OpCode::F64Ge =>{},
+                // Numeric instructions
+                OpCode::I32Const =>{
+                    if let Args::I32ConstArgs(arg) =instruction.args{
+                        self.operandstack.push(arg.into())
+                    }
+                },
+                OpCode::I64Const =>{
+                    if let Args::I64ConstArgs(arg) =instruction.args{
+                        self.operandstack.push(arg.into())
+                    }
+                },
+                OpCode::F32Const =>{
+                    if let Args::F32ConstArgs(arg) =instruction.args{
+                        self.operandstack.push(arg.into())
+                    }
+                },
+                OpCode::F64Const =>{
+                    if let Args::F64ConstArgs(arg) =instruction.args{
+                        self.operandstack.push(arg.into())
+                    }
+                },
 
-    OpCode::I32Clz =>{},
-    OpCode::I32Ctz =>{},
-    OpCode::I32Popcnt =>{},
-    OpCode::I32Add =>{},
-    OpCode::I32Sub =>{},
-    OpCode::I32Mul =>{},
-    OpCode::I32DivS =>{},
-    OpCode::I32DivU =>{},
-    OpCode::I32RemS =>{},
-    OpCode::I32RemU =>{},
-    OpCode::I32And =>{},
-    OpCode::I32Or =>{},
-    OpCode::I32Xor =>{},
-    OpCode::I32Shl =>{},
-    OpCode::I32ShrS =>{},
-    OpCode::I32ShrU =>{},
-    OpCode::I32Rotl =>{},
-    OpCode::I32Rotr =>{},
-    OpCode::I64Clz =>{},
-    OpCode::I64Ctz =>{},
-    OpCode::I64Popcnt =>{},
-    OpCode::I64Add =>{},
-    OpCode::I64Sub =>{},
-    OpCode::I64Mul =>{},
-    OpCode::I64DivS =>{},
-    OpCode::I64DivU =>{},
-    OpCode::I64RemS =>{},
-    OpCode::I64RemU =>{},
-    OpCode::I64And =>{},
-    OpCode::I64Or =>{},
-    OpCode::I64Xor =>{},
-    OpCode::I64Shl =>{},
-    OpCode::I64ShrS =>{},
-    OpCode::I64ShrU =>{},
-    OpCode::I64Rotl =>{},
-    OpCode::I64Rotr =>{},
-    OpCode::F32Abs =>{},
-    OpCode::F32Neg =>{},
-    OpCode::F32Ceil =>{},
-    OpCode::F32Floor =>{},
-    OpCode::F32Trunc =>{},
-    OpCode::F32Nearest =>{},
-    OpCode::F32Sqrt =>{},
-    OpCode::F32Add =>{},
-    OpCode::F32Sub =>{},
-    OpCode::F32Mul =>{},
-    OpCode::F32Div =>{},
-    OpCode::F32Min =>{},
-    OpCode::F32Max =>{},
-    OpCode::F32CopySign =>{},
-    OpCode::F64Abs =>{},
-    OpCode::F64Neg =>{},
-    OpCode::F64Ceil =>{},
-    OpCode::F64Floor =>{},
-    OpCode::F64Trunc =>{},
-    OpCode::F64Nearest =>{},
-    OpCode::F64Sqrt =>{},
-    OpCode::F64Add =>{},
-    OpCode::F64Sub =>{},
-    OpCode::F64Mul =>{},
-    OpCode::F64Div =>{},
-    OpCode::F64Min =>{},
-    OpCode::F64Max =>{},
-    OpCode::F64CopySign =>{},
+                OpCode::I32Eqz =>{
+                    let v = self.operandstack.pop_as::<i32>();
+                    self.operandstack.push((v==0).into())
+                },
+                OpCode::I32Eq =>{
+                    let right = self.operandstack.pop();
+                    let left = self.operandstack.pop();
+                    self.operandstack.push((right==left).into())
+                },
+                OpCode::I32Ne =>{
+                    let right = self.operandstack.pop();
+                    let left = self.operandstack.pop();
+                    self.operandstack.push((right!=left).into())
+                },
+                OpCode::I32LtS =>{
+                    let right = self.operandstack.pop();
+                    let left = self.operandstack.pop();
+                    self.operandstack.push((left<right).into())
+                },
+                OpCode::I32LtU =>{
+                    let right = self.operandstack.pop();
+                    let left = self.operandstack.pop();
+                    self.operandstack.push((left<right).into())
+                },
+                OpCode::I32GtS =>{
+                    let right = self.operandstack.pop();
+                    let left = self.operandstack.pop();
+                    self.operandstack.push((left>right).into())
+                },
+                OpCode::I32GtU =>{
+                    let right = self.operandstack.pop();
+                    let left = self.operandstack.pop();
+                    self.operandstack.push((left>right).into())
+                },
+                OpCode::I32LeS =>{
+                    let right = self.operandstack.pop();
+                    let left = self.operandstack.pop();
+                    self.operandstack.push((left<=right).into())
+                },
+                OpCode::I32LeU =>{
+                    let right = self.operandstack.pop();
+                    let left = self.operandstack.pop();
+                    self.operandstack.push((left<=right).into())
+                },
+                OpCode::I32GeS =>{
+                    let right = self.operandstack.pop();
+                    let left = self.operandstack.pop();
+                    self.operandstack.push((left>=right).into())
+                },
+                OpCode::I32GeU =>{
+                    let right = self.operandstack.pop();
+                    let left = self.operandstack.pop();
+                    self.operandstack.push((left>=right).into())
+                },
+                OpCode::I64Eqz =>{
+                    let v = self.operandstack.pop_as::<i64>();
+                    self.operandstack.push((v==0).into())
+                },
+                OpCode::I64Eq =>{
+                    let right = self.operandstack.pop();
+                    let left = self.operandstack.pop();
+                    self.operandstack.push((right==left).into())
+                },
+                OpCode::I64Ne =>{
+                    let right = self.operandstack.pop();
+                    let left = self.operandstack.pop();
+                    self.operandstack.push((right!=left).into())
+                },
+                OpCode::I64LtS =>{
+                    let right = self.operandstack.pop();
+                    let left = self.operandstack.pop();
+                    self.operandstack.push((left<right).into())
+                },
+                OpCode::I64LtU =>{
+                    let right = self.operandstack.pop();
+                    let left = self.operandstack.pop();
+                    self.operandstack.push((left<right).into())
+                },
+                OpCode::I64GtS =>{
+                    let right = self.operandstack.pop();
+                    let left = self.operandstack.pop();
+                    self.operandstack.push((left>right).into())
+                },
+                OpCode::I64GtU =>{
+                    let right = self.operandstack.pop();
+                    let left = self.operandstack.pop();
+                    self.operandstack.push((left>right).into())
+                },
+                OpCode::I64LeS =>{
+                    let right = self.operandstack.pop();
+                    let left = self.operandstack.pop();
+                    self.operandstack.push((left<=right).into())
+                },
+                OpCode::I64LeU =>{
+                    let right = self.operandstack.pop();
+                    let left = self.operandstack.pop();
+                    self.operandstack.push((left<=right).into())
+                },
+                OpCode::I64GeS =>{
+                    let right = self.operandstack.pop();
+                    let left = self.operandstack.pop();
+                    self.operandstack.push((left>=right).into())
+                },
+                OpCode::I64GeU =>{
+                    let right = self.operandstack.pop();
+                    let left = self.operandstack.pop();
+                    self.operandstack.push((left>=right).into())
+                },
+                OpCode::F32Eq =>{
+                    let right = self.operandstack.pop();
+                    let left = self.operandstack.pop();
+                    self.operandstack.push((right==left).into())
+                },
+                OpCode::F32Ne =>{
+                    let right = self.operandstack.pop();
+                    let left = self.operandstack.pop();
+                    self.operandstack.push((right!=left).into())
+                },
+                OpCode::F32Lt =>{
+                    let right = self.operandstack.pop();
+                    let left = self.operandstack.pop();
+                    self.operandstack.push((left<right).into())
+                },
+                OpCode::F32Gt =>{
+                    let right = self.operandstack.pop();
+                    let left = self.operandstack.pop();
+                    self.operandstack.push((left>right).into())
+                },
+                OpCode::F32Le =>{
+                    let right = self.operandstack.pop();
+                    let left = self.operandstack.pop();
+                    self.operandstack.push((left<=right).into())
+                },
+                OpCode::F32Ge =>{
+                    let right = self.operandstack.pop();
+                    let left = self.operandstack.pop();
+                    self.operandstack.push((left>=right).into())
+                },
+                OpCode::F64Eq =>{
+                    let right = self.operandstack.pop();
+                    let left = self.operandstack.pop();
+                    self.operandstack.push((right==left).into())
+                },
+                OpCode::F64Ne =>{
+                    let right = self.operandstack.pop();
+                    let left = self.operandstack.pop();
+                    self.operandstack.push((right!=left).into())
+                },
+                OpCode::F64Lt =>{
+                    let right = self.operandstack.pop();
+                    let left = self.operandstack.pop();
+                    self.operandstack.push((left<right).into())
+                },
+                OpCode::F64Gt =>{
+                    let right = self.operandstack.pop();
+                    let left = self.operandstack.pop();
+                    self.operandstack.push((left>right).into())
+                },
+                OpCode::F64Le =>{
+                    let right = self.operandstack.pop();
+                    let left = self.operandstack.pop();
+                    self.operandstack.push((left<=right).into())
+                },
+                OpCode::F64Ge =>{
+                    let right = self.operandstack.pop();
+                    let left = self.operandstack.pop();
+                    self.operandstack.push((left>=right).into())
+                },
 
-    OpCode::I32WrapI64 =>{},
-    OpCode::I32TruncF32S =>{},
-    OpCode::I32TruncF32U =>{},
-    OpCode::I32TruncF64S =>{},
-    OpCode::I32TruncF64U =>{},
-    OpCode::I64ExtendI32S =>{},
-    OpCode::I64ExtendI32U =>{},
-    OpCode::I64TruncF32S =>{},
-    OpCode::I64TruncF32U =>{},
-    OpCode::I64TruncF64S =>{},
-    OpCode::I64TruncF64U =>{},
-    OpCode::F32ConvertI32S =>{},
-    OpCode::F32ConvertI32U =>{},
-    OpCode::F32ConvertI64S =>{},
-    OpCode::F32ConvertI64U =>{},
-    OpCode::F32DemoteF64 =>{},
-    OpCode::F64ConvertI32S =>{},
-    OpCode::F64ConvertI32U =>{},
-    OpCode::F64ConvertI64S =>{},
-    OpCode::F64ConvertI64U =>{},
-    OpCode::F64PromoteF32 =>{},
-    OpCode::I32ReinterpretF32 =>{},
-    OpCode::I64ReinterpretF64 =>{},
-    OpCode::F32ReinterpretI32 =>{},
-    OpCode::F64ReinterpretI64 =>{},
-    OpCode::I32Extend8S =>{},
-    OpCode::I32Extend16S =>{},
-    OpCode::I64Extend8S =>{},
-    OpCode::I64Extend16S =>{},
-    OpCode::I64Extend32S =>{},
-    OpCode::TruncSat =>{},
+                OpCode::I32Clz =>{
+                    let v = self.operandstack.pop_as::<i32>();
+                    self.operandstack.push(v.leading_zeros().into())
+                },
+                OpCode::I32Ctz =>{
+                    let v = self.operandstack.pop_as::<i32>();
+                    self.operandstack.push(v.trailing_zeros().into())
+                },
+                OpCode::I32Popcnt =>{
+                    let v = self.operandstack.pop_as::<i32>();
+                    self.operandstack.push(v.count_ones().into())
+                },
+                OpCode::I32Add =>{
+                    let right = self.operandstack.pop_as::<i32>();
+                    let left = self.operandstack.pop_as::<i32>();
+                    self.operandstack.push((right+left).into())
+                },
+                OpCode::I32Sub =>{
+                    let right = self.operandstack.pop_as::<i32>();
+                    let left = self.operandstack.pop_as::<i32>();
+                    self.operandstack.push((left-right).into())
+                },
+                OpCode::I32Mul =>{
+                    let right = self.operandstack.pop_as::<i32>();
+                    let left = self.operandstack.pop_as::<i32>();
+                    self.operandstack.push((left*right).into())
+                },
+                OpCode::I32DivS =>{
+                    let right = self.operandstack.pop_as::<i32>();
+                    let left = self.operandstack.pop_as::<i32>();
+                    self.operandstack.push((left/right).into())
+                },
+                OpCode::I32DivU =>{
+                    let right = self.operandstack.pop_as::<u32>();
+                    let left = self.operandstack.pop_as::<u32>();
+                    self.operandstack.push((left/right).into())
+                },
+                OpCode::I32RemS =>{
+                    let right = self.operandstack.pop_as::<i32>();
+                    let left = self.operandstack.pop_as::<i32>();
+                    self.operandstack.push((left%right).into())
+                },
+                OpCode::I32RemU =>{
+                    let right = self.operandstack.pop_as::<u32>();
+                    let left = self.operandstack.pop_as::<u32>();
+                    self.operandstack.push((left%right).into())
+                },
+                OpCode::I32And =>{
+                    let right = self.operandstack.pop_as::<i32>();
+                    let left = self.operandstack.pop_as::<i32>();
+                    self.operandstack.push((left.bitand(right)).into())
+                },
+                OpCode::I32Or =>{
+                    let right = self.operandstack.pop_as::<i32>();
+                    let left = self.operandstack.pop_as::<i32>();
+                    self.operandstack.push((left.bitor(right)).into())
+                },
+                OpCode::I32Xor =>{
+                    let right = self.operandstack.pop_as::<i32>();
+                    let left = self.operandstack.pop_as::<i32>();
+                    self.operandstack.push((left.bitxor(right)).into())
+                },
+                OpCode::I32Shl =>{
+                    let right = self.operandstack.pop_as::<u32>();
+                    let left = self.operandstack.pop_as::<i32>();
+                    self.operandstack.push((left.wrapping_shl(right)).into())
+                },
+                OpCode::I32ShrS =>{
+                    let right = self.operandstack.pop_as::<u32>();
+                    let left = self.operandstack.pop_as::<i32>();
+                    self.operandstack.push((left.wrapping_shr(right)).into())
+                },
+                OpCode::I32ShrU =>{
+                    let right = self.operandstack.pop_as::<u32>();
+                    let left = self.operandstack.pop_as::<u32>();
+                    self.operandstack.push((left.wrapping_shr(right)).into())
+                },
+                OpCode::I32Rotl =>{
+                    let right = self.operandstack.pop_as::<u32>();
+                    let left = self.operandstack.pop_as::<i32>();
+                    self.operandstack.push((left.rotate_left(right)).into())
+                },
+                OpCode::I32Rotr =>{
+                    let right = self.operandstack.pop_as::<u32>();
+                    let left = self.operandstack.pop_as::<i32>();
+                    self.operandstack.push((left.rotate_right(right)).into())
+                },
+                OpCode::I64Clz =>{
+                    let v = self.operandstack.pop_as::<i64>();
+                    self.operandstack.push(v.leading_zeros().into())
+                },
+                OpCode::I64Ctz =>{
+                    let v = self.operandstack.pop_as::<i64>();
+                    self.operandstack.push(v.trailing_zeros().into())
+                },
+                OpCode::I64Popcnt =>{
+                    let v = self.operandstack.pop_as::<i64>();
+                    self.operandstack.push(v.count_ones().into())
+                },
+                OpCode::I64Add =>{
+                    let right = self.operandstack.pop_as::<i64>();
+                    let left = self.operandstack.pop_as::<i64>();
+                    self.operandstack.push((right+left).into())
+                },
+                OpCode::I64Sub =>{
+                    let right = self.operandstack.pop_as::<i64>();
+                    let left = self.operandstack.pop_as::<i64>();
+                    self.operandstack.push((left-right).into())
+                },
+                OpCode::I64Mul =>{
+                    let right = self.operandstack.pop_as::<i64>();
+                    let left = self.operandstack.pop_as::<i64>();
+                    self.operandstack.push((left*right).into())
+                },
+                OpCode::I64DivS =>{
+                    let right = self.operandstack.pop_as::<i64>();
+                    let left = self.operandstack.pop_as::<i64>();
+                    self.operandstack.push((left/right).into())
+                },
+                OpCode::I64DivU =>{
+                    let right = self.operandstack.pop_as::<u64>();
+                    let left = self.operandstack.pop_as::<u64>();
+                    self.operandstack.push((left/right).into())
+                },
+                OpCode::I64RemS =>{
+                    let right = self.operandstack.pop_as::<i64>();
+                    let left = self.operandstack.pop_as::<i64>();
+                    self.operandstack.push((left%right).into())
+                },
+                OpCode::I64RemU =>{
+                    let right = self.operandstack.pop_as::<u64>();
+                    let left = self.operandstack.pop_as::<u64>();
+                    self.operandstack.push((left%right).into())
+                },
+                OpCode::I64And =>{
+                    let right = self.operandstack.pop_as::<i64>();
+                    let left = self.operandstack.pop_as::<i64>();
+                    self.operandstack.push((right+left).into())
+                },
+                OpCode::I64Or =>{
+                    let right = self.operandstack.pop_as::<i64>();
+                    let left = self.operandstack.pop_as::<i64>();
+                    self.operandstack.push((left.bitor(right)).into())
+                },
+                OpCode::I64Xor =>{
+                    let right = self.operandstack.pop_as::<i64>();
+                    let left = self.operandstack.pop_as::<i64>();
+                    self.operandstack.push((left.bitxor(right)).into())
+                },
+                OpCode::I64Shl =>{
+                    let right = self.operandstack.pop_as::<u64>();
+                    let left = self.operandstack.pop_as::<i64>();
+                    self.operandstack.push((left.wrapping_shl(right as u32)).into())
+                },
+                OpCode::I64ShrS =>{
+                    let right = self.operandstack.pop_as::<u64>();
+                    let left = self.operandstack.pop_as::<i64>();
+                    self.operandstack.push((left.wrapping_shr(right as u32)).into())
+                },
+                OpCode::I64ShrU =>{
+                    let right = self.operandstack.pop_as::<u64>();
+                    let left = self.operandstack.pop_as::<u64>();
+                    self.operandstack.push((left.wrapping_shr(right as u32)).into())
+                },
+                OpCode::I64Rotl =>{
+                    let right = self.operandstack.pop_as::<u64>();
+                    let left = self.operandstack.pop_as::<i64>();
+                    self.operandstack.push((left.rotate_left(right as u32)).into())
+                },
+                OpCode::I64Rotr =>{
+                    let right = self.operandstack.pop_as::<u64>();
+                    let left = self.operandstack.pop_as::<i64>();
+                    self.operandstack.push((left.rotate_right(right as u32)).into())
+                },
+                OpCode::F32Abs =>{
+                    let v = self.operandstack.pop_as::<f32>();
+                    self.operandstack.push(v.abs().into())
+                },
+                OpCode::F32Neg =>{
+                    let v = self.operandstack.pop_as::<f32>();
+                    self.operandstack.push(v.neg().into())
+                },
+                OpCode::F32Ceil =>{
+                    let v = self.operandstack.pop_as::<f32>();
+                    self.operandstack.push(v.ceil().into())
+                },
+                OpCode::F32Floor =>{
+                    let v = self.operandstack.pop_as::<f32>();
+                    self.operandstack.push(v.floor().into())
+                },
+                OpCode::F32Trunc =>{
+                    let v = self.operandstack.pop_as::<f32>();
+                    self.operandstack.push(v.trunc().into())
+                },
+                OpCode::F32Nearest =>{
+                    let f = self.operandstack.pop_as::<f32>();
+                    let fround = f.round();
+                    if (f - fround).abs() == 0.5 && fround % 2.0 != 0.0 {
+                        self.operandstack.push(f.trunc().into())
+                    } else {
+                        self.operandstack.push(fround.into())
+                        
+                    }
+                },
+                OpCode::F32Sqrt =>{
+                    let v = self.operandstack.pop_as::<f32>();
+                    self.operandstack.push(v.sqrt().into())
+                },
+                OpCode::F32Add =>{
+                    let right = self.operandstack.pop_as::<f32>();
+                    let left = self.operandstack.pop_as::<f32>();
+                    self.operandstack.push((right+left).into())
+                },
+                OpCode::F32Sub =>{
+                    let right = self.operandstack.pop_as::<f32>();
+                    let left = self.operandstack.pop_as::<f32>();
+                    self.operandstack.push((left-right).into())
+                },
+                OpCode::F32Mul =>{
+                    let right = self.operandstack.pop_as::<f32>();
+                    let left = self.operandstack.pop_as::<f32>();
+                    self.operandstack.push((left*right).into())
+                },
+                OpCode::F32Div =>{
+                    let right = self.operandstack.pop_as::<f32>();
+                    let left = self.operandstack.pop_as::<f32>();
+                    self.operandstack.push((left/right).into())
+                },
+                OpCode::F32Min =>{
+                    let right = self.operandstack.pop_as::<f32>();
+                    let left = self.operandstack.pop_as::<f32>();
+                    self.operandstack.push((left.min(right)).into())
+                },
+                OpCode::F32Max =>{
+                    let right = self.operandstack.pop_as::<f32>();
+                    let left = self.operandstack.pop_as::<f32>();
+                    self.operandstack.push((left.max(right)).into())
+                },
+                OpCode::F32CopySign =>{
+                    let right = self.operandstack.pop_as::<f32>();
+                    let left = self.operandstack.pop_as::<f32>();
+                    self.operandstack.push((left.copysign(right)).into())
+                },
+                OpCode::F64Abs =>{
+                    let v = self.operandstack.pop_as::<f64>();
+                    self.operandstack.push(v.abs().into())
+                },
+                OpCode::F64Neg =>{
+                    let v = self.operandstack.pop_as::<f64>();
+                    self.operandstack.push(v.neg().into())
+                },
+                OpCode::F64Ceil =>{
+                    let v = self.operandstack.pop_as::<f64>();
+                    self.operandstack.push(v.ceil().into())
+                },
+                OpCode::F64Floor =>{
+                    let v = self.operandstack.pop_as::<f64>();
+                    self.operandstack.push(v.floor().into())
+                },
+                OpCode::F64Trunc =>{
+                    let v = self.operandstack.pop_as::<f64>();
+                    self.operandstack.push(v.trunc().into())
+                },
+                OpCode::F64Nearest =>{
+                    let f = self.operandstack.pop_as::<f64>();
+                    let fround = f.round();
+                    if (f - fround).abs() == 0.5 && fround % 2.0 != 0.0 {
+                        self.operandstack.push(f.trunc().into())
+                    } else {
+                        self.operandstack.push(fround.into())
+                        
+                    }
+                },
+                OpCode::F64Sqrt =>{
+                    let v = self.operandstack.pop_as::<f64>();
+                    self.operandstack.push(v.sqrt().into())
+                },
+                OpCode::F64Add =>{
+                    let right = self.operandstack.pop_as::<f64>();
+                    let left = self.operandstack.pop_as::<f64>();
+                    self.operandstack.push((right+left).into())
+                },
+                OpCode::F64Sub =>{
+                    let right = self.operandstack.pop_as::<f64>();
+                    let left = self.operandstack.pop_as::<f64>();
+                    self.operandstack.push((left-right).into())
+                },
+                OpCode::F64Mul =>{
+                    let right = self.operandstack.pop_as::<f64>();
+                    let left = self.operandstack.pop_as::<f64>();
+                    self.operandstack.push((left*right).into())
+                },
+                OpCode::F64Div =>{
+                    let right = self.operandstack.pop_as::<f64>();
+                    let left = self.operandstack.pop_as::<f64>();
+                    self.operandstack.push((left/right).into())
+                },
+                OpCode::F64Min =>{
+                    let right = self.operandstack.pop_as::<f32>();
+                    let left = self.operandstack.pop_as::<f32>();
+                    self.operandstack.push((left.min(right)).into())
+                },
+                OpCode::F64Max =>{
+                    let right = self.operandstack.pop_as::<f32>();
+                    let left = self.operandstack.pop_as::<f32>();
+                    self.operandstack.push((left.max(right)).into())
+                },
+                OpCode::F64CopySign =>{
+                    let right = self.operandstack.pop_as::<f64>();
+                    let left = self.operandstack.pop_as::<f64>();
+                    self.operandstack.push((left.copysign(right)).into())
+                },
+
+                OpCode::I32WrapI64 =>{
+                    let left = self.operandstack.pop_as::<i64>();
+                    self.operandstack.push((left as i32).into())
+                },
+                OpCode::I32TruncF32S =>{
+                    let left = self.operandstack.pop_as::<f32>();
+                    left.try_truncate_into();
+                    self.operandstack.push((left as i32).into())
+                },
+                OpCode::I32TruncF32U =>{
+                    let left = self.operandstack.pop_as::<f32>();
+                    self.operandstack.push((left as i32).into())
+                },
+                OpCode::I32TruncF64S =>{
+                    let left = self.operandstack.pop_as::<f64>();
+                    self.operandstack.push((left as i32).into())
+                },
+                OpCode::I32TruncF64U =>{
+                    let left = self.operandstack.pop_as::<f64>();
+                    self.operandstack.push((left as i32).into())
+                },
+                OpCode::I64ExtendI32S =>{},
+                OpCode::I64ExtendI32U =>{},
+                OpCode::I64TruncF32S =>{},
+                OpCode::I64TruncF32U =>{},
+                OpCode::I64TruncF64S =>{},
+                OpCode::I64TruncF64U =>{},
+                OpCode::F32ConvertI32S =>{},
+                OpCode::F32ConvertI32U =>{},
+                OpCode::F32ConvertI64S =>{},
+                OpCode::F32ConvertI64U =>{},
+                OpCode::F32DemoteF64 =>{},
+                OpCode::F64ConvertI32S =>{},
+                OpCode::F64ConvertI32U =>{},
+                OpCode::F64ConvertI64S =>{},
+                OpCode::F64ConvertI64U =>{},
+                OpCode::F64PromoteF32 =>{},
+                OpCode::I32ReinterpretF32 =>{},
+                OpCode::I64ReinterpretF64 =>{},
+                OpCode::F32ReinterpretI32 =>{},
+                OpCode::F64ReinterpretI64 =>{},
+                OpCode::I32Extend8S =>{},
+                OpCode::I32Extend16S =>{},
+                OpCode::I64Extend8S =>{},
+                OpCode::I64Extend16S =>{},
+                OpCode::I64Extend32S =>{},
+                OpCode::TruncSat =>{},
             }
         }
 
