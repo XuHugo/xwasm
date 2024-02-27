@@ -1,0 +1,26 @@
+### generated files ###
+bin/
+target/
+log/
+data/
+.idea/
+*/.idea/
+.cargo/
+.cargo-remote.toml
+*.bin
+*.iml
+statedb/db
+
+### macOS Specific ignores ###
+.DS_Store
+.AppleDouble
+.LSOverride
+
+### Other ###
+temp/
+**/target
+**/*.rs.bk
+/.idea
+*.swo
+*.swp
+nohup.out
