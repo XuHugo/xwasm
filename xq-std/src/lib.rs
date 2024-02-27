@@ -58,6 +58,7 @@ pub use traits::*;
 pub use types::*;
 
 extern crate wee_alloc;
+pub use serde_json;
 
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;

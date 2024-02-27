@@ -5,6 +5,7 @@ use alloc::{boxed::Box, collections::*, string::String, vec::Vec};
 use serde_json::json;
 #[cfg(not(feature = "std"))]
 use core::{marker, mem::MaybeUninit, slice};
+use std::println;
 #[cfg(feature = "std")]
 use std::{collections::*, marker, mem::MaybeUninit, slice};
 
@@ -13,46 +14,38 @@ use serde::{Deserialize, Serialize};
 impl Context for ContractContext{
 
     fn owner(&self) -> Address{
-        let mut bytes: MaybeUninit<[u8; 20]> = MaybeUninit::uninit();
+        let mut bytes: MaybeUninit<[u8; ADDRESS_NUM_LEN]> = MaybeUninit::uninit();
         let ptr = bytes.as_mut_ptr();
         let address = unsafe {
             get_owner(ptr as *mut u8);
             bytes.assume_init()
         };
-        address
+        Address(address)
     }
 
     fn invoker(&self) -> Address{
-        let mut bytes: MaybeUninit<[u8; 20]> = MaybeUninit::uninit();
+        let mut bytes: MaybeUninit<[u8; ADDRESS_NUM_LEN]> = MaybeUninit::uninit();
         let ptr = bytes.as_mut_ptr();
         let address = unsafe {
             get_invoker(ptr as *mut u8);
             bytes.assume_init()
         };
-        address
+        Address(address)
     }
 
-    fn sender(&self) -> Address{
-        let mut bytes: MaybeUninit<[u8; 20]> = MaybeUninit::uninit();
-        let ptr = bytes.as_mut_ptr();
-        let address = unsafe {
-            get_sender(ptr as *mut u8);
-            bytes.assume_init()
-        };
-        address
-    }
     fn self_address(&self) -> Address{
-        let mut bytes: MaybeUninit<[u8; 20]> = MaybeUninit::uninit();
+        let mut bytes: MaybeUninit<[u8; ADDRESS_NUM_LEN]> = MaybeUninit::uninit();
         let ptr = bytes.as_mut_ptr();
         let address = unsafe {
-            get_self_address(ptr as *mut u8);
+            get_contract_address(ptr as *mut u8);
             bytes.assume_init()
         };
-        address
+        Address(address)
     }
+    
     fn self_balance(&self) -> u64{
         unsafe { 
-            get_self_balance()
+            get_contract_balance()
          }
     }
 
@@ -65,25 +58,17 @@ impl Context for ContractContext{
         // unsafe {
         //     get_parameter(bytes.as_mut_ptr()  as *mut u8, 1024);
         // }
-
-        let mut p = [0;1024];
-        let _ret = unsafe { 
-            get_parameter(p.as_mut_ptr(), 1024)
+        println!("paramteter start:");
+        let mut p = [0; MAX_PREALLOCATED_CAPACITY];
+        let ret = unsafe { 
+            get_parameter(p.as_mut_ptr())
          };
-         let p =   serde_json::from_slice(&p).unwrap();
-        // //test
-        // //let mut bytes:[u8;1024] = [0;1024];
-        // let val = json!({"name":"200", "age": 111, "sex":"ok!"});
-        // let val = serde_json::to_vec(&val).unwrap();
-        // //bytes.write(val.as_slice() as [u8; 1024]);
-        
-        // // let par = unsafe {
-        // //     bytes.assume_init()
-        // // }; 
-        // // let par = val.clone();
-        // // let p: T =   serde_json::from_slice(&par).unwrap();
-        // let par = val.clone();
-        // let p =   serde_json::from_slice(&par).unwrap();
+         let p =   match serde_json::from_slice(&p[..ret as usize]){
+            Ok(o) => o,
+            Err(err) => {
+                panic!("paramteter error: {}",err);
+            },
+        };
         p
         
     }
@@ -91,9 +76,9 @@ impl Context for ContractContext{
     fn error(&self, err:String){
         let err_len = err.len();
         let ptr = err.as_ptr();
-        unsafe { 
-            set_error(ptr, err_len as u32);
-         }
+        // unsafe { 
+        //     set_error(ptr, err_len as u32);
+        //  }
         println!("error_set {}",err);
     }
 
@@ -106,13 +91,17 @@ impl Context for ContractContext{
         println!("return data set {}",data);
     }
 
-    fn store_get(&self, mut key:String)->String{
+    fn store_get<T>(&self, mut key:String)->T
+    where T: serde::de::DeserializeOwned
+    {
+        let mut p = [0; MAX_PREALLOCATED_CAPACITY];
         let key_len = key.len();
         let ptr = key.as_mut_ptr();
-        unsafe { 
-            get_store(ptr, key_len as u32);
-         }
-        format!("store get: {:?}",key)
+        let ret = unsafe { 
+            get_store(ptr, key_len as u32, p.as_mut_ptr())
+         };
+         let p =   serde_json::from_slice(&p[..ret as usize]).unwrap();
+         p
     }
     fn store_set(&self, mut key:String, mut value:String)-> bool{
         let key_len = key.len();
@@ -122,7 +111,6 @@ impl Context for ContractContext{
         let _a =unsafe { 
             set_store(kptr, key_len as u32, vptr, value_len as u32)
          };
-        println!("store_set({}=>{})",key, value);
         true
     }
 
@@ -136,9 +124,9 @@ impl Context for ContractContext{
     }
 
     fn transfer(&self, addr:Address, amount:u64)->bool{
-        let address = addr.as_ptr();
+        let address = addr.0.as_ptr();
         let ret = unsafe { 
-            _transfer(address, amount)
+            transfer(address, amount)
         };
         if ret == 0{
             false
@@ -146,12 +134,14 @@ impl Context for ContractContext{
             true
         }
     }
-    fn call(&self, addr:Address, amount:u64, arg:String)->bool{
-        let address = addr.as_ptr();
+    fn call(&self, addr:Address, amount:u64, func:String, arg:String)->bool{
+        let address = addr.0.as_ptr();
         let parameter = arg.as_ptr();
         let len = arg.len();
+        let func_name = func.as_ptr();
+        let func_name_len = func.len();
         let ret = unsafe { 
-            _call(address, amount, parameter, len as u32)
+            call(address, amount, func_name, func_name_len as u32, parameter, len as u32)
         };
         if ret == 0{
             false
@@ -167,13 +157,13 @@ impl Context for ContractContext{
     }
     fn block_number(&self)->u64{
         unsafe { 
-            get_block_number()
+            get_block_height()
          }
     }
     fn tx_hash(&self) -> String{
         let mut h = [0;64];
         let _ret = unsafe { 
-            get_tx_hash(h.as_mut_ptr())
+            get_block_hash(h.as_mut_ptr())
          };
          String::from_utf8(h.to_vec()).unwrap()
     }

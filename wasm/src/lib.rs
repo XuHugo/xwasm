@@ -1,7 +1,11 @@
-pub mod wasmtime;
+pub mod wasmtime_vm;
 pub mod types;
 
+use crate::types::{Context, WasmResult};
 
+pub trait VM{
+    fn execute(func_name: &str, context: Context, binary: &[u8], amount: u64) -> anyhow::Result<WasmResult>;
+}
 
 
 #[cfg(test)]

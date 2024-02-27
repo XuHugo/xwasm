@@ -1,7 +1,12 @@
 //#![cfg_attr(not(feature = "std"), no_std)]
+#![no_std]
+extern crate alloc;
+//extern crate xq_derive;
+use alloc::string::{ToString, String};
 use serde_derive::{Serialize, Deserialize};
+//#[macro_use]
 use xq_derive::{init,call, Output};
-use xq_std::*;
+use xq_std::Context;
 use serde::{Serialize};
 use core::result::Result;
 
@@ -44,31 +49,17 @@ enum ContractError {
 type CResult<T> = Result<T, ContractError>;
 
 #[init(contract="xq", payable)]
-fn init<C:Context + Copy>(ctx: C, amoun3:u64)->CResult<RetValue>{
-    println!("this is init ! amount:{:?}", amoun3);
+fn init<C:Context + Copy>(ctx: C, amoun3:u64, )->CResult<RetValue>{
     let a:Param = ctx.paramteter();
-    println!("this is init !parameter{:?}", a);
-    //let ret = RetValue{name:"xx".to_string(), age:22, sex:"man".to_string()};
+    // //let ret = RetValue{name:"xx".to_string(), age:22, sex:"man".to_string()};
     let x = ContractError::ParseParams.to_string();
-    println!("this is init enum string{:?}", x);
     Err(ContractError::ParseParams)
 }
-#[call(contract="xq", func="abc")]
+#[call(contract="xq", function="abc")]
 fn rcv<C:Context + Copy>(ctx: C,)->CResult<RetValue>{
-    println!("this is call ! amount:{:?}", 0);
-
     let a:Param = ctx.paramteter();
-    println!("this is call !parameter{:?}", a);
-    let ret = RetValue{name:"xx".to_string(), age:22, sex:"man".to_string()};
+    let ret = RetValue{name:a.name, age:a.age, sex:a.sex};
+    //let a:Param = ctx.paramteter();
     Ok(ret)
 }
 
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
-    }
-}

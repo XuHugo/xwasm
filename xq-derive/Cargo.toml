@@ -17,5 +17,4 @@ path = "../xq-std"
 proc-macro = true
 
 [features]
-wasm-test = []
-build-schema = []
+

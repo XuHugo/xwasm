@@ -1,4 +1,4 @@
-use crate::{module::Module, instruction::{Expr, Args}, opcodes::OpCode};
+use crate::{module::{Module, ElementSection}, instruction::{Expr, Args}, opcodes::OpCode};
 use num_enum::TryFromPrimitive;
 use std::{convert::{TryFrom, TryInto}, ops::{Neg, BitAnd, BitOr, BitXor, Shl, Shr}};
 
@@ -214,7 +214,7 @@ impl Interpreter{
         //self.module.invoke_export(func_name)
     }
 
-    pub fn execCode(&mut self, instructions: Expr){
+    pub fn execCode(&mut self, instructions: Expr)->Result<i32, &str>{
         for instruction in instructions.iter(){
             match OpCode::try_from(instruction.opcode).unwrap(){
                 OpCode::Unreachable=>{
@@ -790,8 +790,12 @@ impl Interpreter{
                 },
                 OpCode::I32TruncF32S =>{
                     let left = self.operandstack.pop_as::<f32>();
-                    left.try_truncate_into();
-                    self.operandstack.push((left as i32).into())
+                    let n = if let Some(i) = i32_trunc_f32_s(left){
+                        i
+                    }else{
+                        return Err("i32_trunc_f32_s error!")
+                    };
+                    self.operandstack.push((n).into())
                 },
                 OpCode::I32TruncF32U =>{
                     let left = self.operandstack.pop_as::<f32>();
@@ -833,7 +837,30 @@ impl Interpreter{
                 OpCode::TruncSat =>{},
             }
         }
-
+        Ok(0)
     }
 
 }
+
+macro_rules! trunc {
+    ($func_name:ident, $float:ty, $int:ty) => {
+        pub fn $func_name(f: $float) -> Option<$int>{
+            const MAX: $float = <$int>::MAX as $float;
+            const MIN: $float = <$int>::MIN as $float;
+    
+            let gtm = if MIN != MIN - 1.0{
+                MIN - 1.0 < f
+            }else{
+                MIN <= f
+            };
+    
+            if gtm && f < MAX + 1.0{
+                Some(f as $int)
+            }else{
+                None
+            }
+        }
+    };
+}
+
+trunc!(i32_trunc_f32_s, f32, i32);
