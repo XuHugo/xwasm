@@ -1,8 +1,0 @@
-[package]
-name = "crypto"
-description = "Xchain"
-version = "0.1.0"
-
-[dependencies]
-anyhow = "1.0.62"
-serde = { version = "1.0.137", features = ["derive", "rc"] }
