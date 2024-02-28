@@ -1,12 +1,16 @@
-pub mod wasmtime_vm;
+mod hostfunc;
 pub mod types;
-
+pub mod vm;
 use crate::types::{Context, WasmResult};
 
-pub trait VM{
-    fn execute(func_name: &str, context: Context, binary: &[u8], amount: u64) -> anyhow::Result<WasmResult>;
+pub trait VM {
+    fn execute(
+        func_name: &str,
+        context: Context,
+        binary: &[u8],
+        amount: u64,
+    ) -> anyhow::Result<WasmResult>;
 }
-
 
 #[cfg(test)]
 mod tests {
