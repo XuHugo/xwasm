@@ -6,7 +6,7 @@ use alloc::string::{String, ToString};
 use serde_derive::{Deserialize, Serialize};
 //#[macro_use]
 use core::result::Result;
-use serde::Serialize;
+
 use xq_derive::{call, init, Output};
 use xq_std::Context;
 
@@ -33,6 +33,7 @@ struct RetValue {
     sex: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Output)]
 enum ContractError {
     ParseParams,
@@ -46,14 +47,14 @@ enum ContractError {
 type CResult<T> = Result<T, ContractError>;
 
 #[init(contract = "xq", payable)]
-fn init<C: Context + Copy>(ctx: C, amoun3: u64) -> CResult<RetValue> {
+fn init<C: Context + Copy>(ctx: C, _amoun3: u64) -> CResult<RetValue> {
     let a: Param = ctx.paramteter();
     let ret = RetValue {
         name: a.name,
         age: a.age,
         sex: a.sex,
     };
-    let x = ContractError::ParseParams.to_string();
+    let _x = ContractError::ParseParams.to_string();
     //Err(ContractError::ParseParams)
     Ok(ret)
 }

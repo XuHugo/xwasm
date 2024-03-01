@@ -67,8 +67,8 @@ impl Context for ContractContext {
     }
 
     fn error(&self, err: String) {
-        let err_len = err.len();
-        let ptr = err.as_ptr();
+        let _err_len = err.len();
+        let _ptr = err.as_ptr();
         // unsafe {
         //     set_error(ptr, err_len as u32);
         //  }

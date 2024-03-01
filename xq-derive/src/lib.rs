@@ -14,6 +14,7 @@ use quote::{quote, ToTokens};
 
 use syn::{parse_macro_input, spanned::Spanned, AttributeArgs, Item, Meta, NestedMeta};
 
+#[allow(dead_code)]
 fn attach_error<A>(mut v: syn::Result<A>, msg: &str) -> syn::Result<A> {
     if let Err(e) = v.as_mut() {
         let span = e.span();
@@ -22,6 +23,7 @@ fn attach_error<A>(mut v: syn::Result<A>, msg: &str) -> syn::Result<A> {
     v
 }
 
+#[allow(dead_code)]
 fn get_attribute_value<'a, I: IntoIterator<Item = &'a Meta>>(
     iter: I,
     name: &str,
@@ -61,10 +63,12 @@ fn get_attribute_value<'a, I: IntoIterator<Item = &'a Meta>>(
     Ok(None)
 }
 
+#[allow(dead_code)]
 fn contains_attribute<'a, I: IntoIterator<Item = &'a Meta>>(iter: I, name: &str) -> bool {
     iter.into_iter().any(|attr| attr.path().is_ident(name))
 }
 
+#[allow(dead_code)]
 fn contract_function_optional_args_tokens<'a, I: Copy + IntoIterator<Item = &'a Meta>>(
     attrs: I,
     amount_ident: &syn::Ident,
@@ -77,7 +81,7 @@ fn contract_function_optional_args_tokens<'a, I: Copy + IntoIterator<Item = &'a 
         fn_args.push(quote!(#amount_ident));
     } else {
         setup_fn_args.extend(quote! {
-            if #amount_ident.micro_gtu != 0 {
+            if #amount_ident != 0 {
                 return -1;
             }
         });
@@ -86,7 +90,7 @@ fn contract_function_optional_args_tokens<'a, I: Copy + IntoIterator<Item = &'a 
     if contains_attribute(attrs, "enable_logger") {
         required_args.push("logger: &mut impl HasLogger");
         let logger_ident = format_ident!("logger");
-        setup_fn_args.extend(quote!(let mut #logger_ident = concordium_std::Logger::init();));
+        setup_fn_args.extend(quote!(let mut #logger_ident = xq_std::Logger::init();));
         fn_args.push(quote!(&mut #logger_ident));
     }
     (setup_fn_args, fn_args)
@@ -207,8 +211,8 @@ pub fn init(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn call(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attrs = parse_macro_input!(attr as AttributeArgs);
-    //let contract = get_attribute(attrs.clone(), "contract").unwrap().unwrap();
-    //let function = get_attribute(attrs.clone(), "function").unwrap().unwrap();
+    let contract = get_attribute(attrs.clone(), "contract").unwrap().unwrap();
+    let function = get_attribute(attrs.clone(), "function").unwrap().unwrap();
     //let payable = contains_attribute2(attrs.clone(), "payable");
 
     let mut setup_function_args = proc_macro2::TokenStream::new();
@@ -226,8 +230,8 @@ pub fn call(attr: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     let ast = parse_macro_input!(item as Item);
-    //let call_function_name = format_ident!("call_{}",function.value());
-    let call_function_name = format_ident!("call_{}", "abc");
+    let call_function_name = format_ident!("{}_{}", contract.value(), function.value());
+    //let call_function_name = format_ident!("call_{}", "abc");
     //let mut  output = proc_macro2::TokenStream::new();
 
     let function_name = if let syn::Item::Fn(itemfn) = ast.clone() {
