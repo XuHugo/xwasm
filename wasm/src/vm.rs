@@ -1,12 +1,8 @@
 use crate::{
     hostfunc::host_func_init,
-    types::{
-        Address, Context, WasmError, WasmResult, ADDRESS_SIZE, GAS_ENV_FUNC_BASE,
-        GAS_INIT_FUNC_BASE, GAS_SCALE,
-    },
+    types::{Context, WasmError, WasmResult},
 };
-use anyhow::{anyhow, bail, ensure, Result};
-use std::{ops::Deref, time::Instant};
+use anyhow::anyhow;
 use wasmtime::Val::I64;
 use wasmtime::*;
 
@@ -37,14 +33,14 @@ pub fn execute(
         None => return Err(anyhow!("can't find {} func from contract!", func_name)),
     };
     let mut r = [wasmtime::Val::null()];
-    let ret = match run.call(&mut store, &[I64(amount as i64)], &mut r) {
+    let _ = match run.call(&mut store, &[I64(amount as i64)], &mut r) {
         Ok(_) => (),
         Err(trap) => {
             println!("call {} error: {:?}", func_name, trap);
             return Err(trap);
         }
     };
-    let mut used_gas = store.data().gas_limit - store.data().gas_counter;
+    let used_gas = store.data().gas_limit - store.data().gas_counter;
     let ret = Some(r[0].clone());
 
     if let Some(Val::I32(n)) = ret {

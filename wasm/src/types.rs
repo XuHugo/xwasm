@@ -1,4 +1,4 @@
-use std::{fmt::Display, vec};
+use std::fmt::Display;
 
 use crate::{vm, VM};
 use statedb::STATE_DB;
@@ -47,16 +47,16 @@ pub struct Metadata {
 }
 
 impl Metadata {
-    pub fn transfer(&self, address: Address, amount: u64) -> Result<(), WasmError> {
+    pub fn transfer(&self, _address: Address, _amountt: u64) -> Result<(), WasmError> {
         Ok(())
     }
 
     pub fn call(
         &self,
-        address: Address,
-        amount: u64,
-        func: String,
-        arg: String,
+        _address: Address,
+        _amount: u64,
+        _func: String,
+        _arg: String,
     ) -> Result<(), WasmError> {
         Ok(())
     }
@@ -125,6 +125,7 @@ impl Display for WasmError {
 
 impl std::error::Error for WasmError {}
 
+#[allow(dead_code)]
 #[derive(Default)]
 pub struct Context {
     pub(crate) func_name: String,

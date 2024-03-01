@@ -1,5 +1,5 @@
 use crate::types::{Address, Context, ADDRESS_SIZE, GAS_ENV_FUNC_BASE};
-use anyhow::{anyhow, bail, ensure, Result};
+use anyhow::Result;
 use wasmtime::{Caller, Engine, Extern, Linker};
 
 // env function for wasm
@@ -96,7 +96,7 @@ pub fn host_func_init(engine: &Engine) -> Result<Linker<Context>> {
 
             match mem.write(caller, ptr as usize, param) {
                 Ok(_) => (),
-                Err(e) => return -103i32,
+                Err(_e) => return -103i32,
             };
             param.len() as i32
         },
@@ -132,7 +132,7 @@ pub fn host_func_init(engine: &Engine) -> Result<Linker<Context>> {
             };
             match mem.write(caller, ptr as usize, &tx.as_bytes()) {
                 Ok(_) => (),
-                Err(e) => return -103i32,
+                Err(_e) => return -103i32,
             };
             tx.as_bytes().len() as i32
         },
@@ -226,7 +226,7 @@ pub fn host_func_init(engine: &Engine) -> Result<Linker<Context>> {
 
             match caller.data().metadata.set_store(key, value) {
                 Ok(_) => (),
-                Err(e) => return -108i32,
+                Err(_e) => return -108i32,
             };
             0
         },
@@ -253,12 +253,12 @@ pub fn host_func_init(engine: &Engine) -> Result<Linker<Context>> {
 
             let value: Vec<u8> = match caller.data().metadata.get_store(key) {
                 Ok(k) => k,
-                Err(e) => return -108i32,
+                Err(_e) => return -108i32,
             };
 
             match mem.write(caller, vstart as usize, &value.as_slice()) {
                 Ok(_) => (),
-                Err(e) => return -108i32,
+                Err(_e) => return -108i32,
             };
 
             value.len() as i32
@@ -324,7 +324,7 @@ pub fn host_func_init(engine: &Engine) -> Result<Linker<Context>> {
                 .call(Address::from(address), amount, func, arg)
             {
                 Ok(_) => (),
-                Err(e) => return -108i32,
+                Err(_e) => return -108i32,
             };
             0
         },
@@ -357,7 +357,7 @@ pub fn host_func_init(engine: &Engine) -> Result<Linker<Context>> {
                 .transfer(Address::from(address), amount)
             {
                 Ok(_) => (),
-                Err(e) => return -108i32,
+                Err(_e) => return -108i32,
             };
             0
         },

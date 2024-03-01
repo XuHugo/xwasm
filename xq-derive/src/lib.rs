@@ -12,10 +12,7 @@ use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::{quote, ToTokens};
 
-use syn::{
-    parse::Parser, parse_macro_input, punctuated::*, spanned::Spanned, DataEnum, Ident, Meta, Token, AttributeArgs, NestedMeta, Item
-};
-
+use syn::{parse_macro_input, spanned::Spanned, AttributeArgs, Item, Meta, NestedMeta};
 
 fn attach_error<A>(mut v: syn::Result<A>, msg: &str) -> syn::Result<A> {
     if let Err(e) = v.as_mut() {
@@ -95,45 +92,55 @@ fn contract_function_optional_args_tokens<'a, I: Copy + IntoIterator<Item = &'a 
     (setup_fn_args, fn_args)
 }
 
-fn get_attribute(metas:Vec<NestedMeta>, value: &str)-> syn::Result<Option<syn::LitStr>>{
-    for item in  metas{
-        match item{
-            NestedMeta::Meta(meta)=>{
-                match meta{
-                    Meta::NameValue(nv)=>{
-                        if nv.path.is_ident(value){
-                            if let syn::Lit::Str(lit) = nv.lit{
-                                return Ok(Some(lit))
-                            }else{
-                                return Err(syn::Error::new(nv.span(), format!("the attribute must be a string literal.")))
-                            }
+fn get_attribute(metas: Vec<NestedMeta>, value: &str) -> syn::Result<Option<syn::LitStr>> {
+    for item in metas {
+        match item {
+            NestedMeta::Meta(meta) => match meta {
+                Meta::NameValue(nv) => {
+                    if nv.path.is_ident(value) {
+                        if let syn::Lit::Str(lit) = nv.lit {
+                            return Ok(Some(lit));
+                        } else {
+                            return Err(syn::Error::new(
+                                nv.span(),
+                                format!("the attribute must be a string literal."),
+                            ));
                         }
-                    }, 
-                    Meta::Path(_)=>{
-                        return Err(syn::Error::new(meta.span(), format!("the attribute must be a string literal.")))
-                    },
-                    Meta::List(_)=>{
-                        return Err(syn::Error::new(meta.span(), format!("the attribute must be a string literal.")))
-                    },
+                    }
+                }
+                Meta::Path(_) => {
+                    return Err(syn::Error::new(
+                        meta.span(),
+                        format!("the attribute must be a string literal."),
+                    ))
+                }
+                Meta::List(_) => {
+                    return Err(syn::Error::new(
+                        meta.span(),
+                        format!("the attribute must be a string literal."),
+                    ))
                 }
             },
-            NestedMeta::Lit(_)=>{
-                return Err(syn::Error::new(item.span(), format!("the attribute must be a string literal.")))
-            },
+            NestedMeta::Lit(_) => {
+                return Err(syn::Error::new(
+                    item.span(),
+                    format!("the attribute must be a string literal."),
+                ))
+            }
         }
     }
-    return Ok(None)
+    return Ok(None);
 }
 
-fn contains_attribute2(metas:Vec<NestedMeta>, value: &str) -> bool {
-    for attr in metas.iter(){
-        match attr{
-            NestedMeta::Meta(meta)=>{
-                if meta.path().is_ident(value){
-                    return true
+fn contains_attribute2(metas: Vec<NestedMeta>, value: &str) -> bool {
+    for attr in metas.iter() {
+        match attr {
+            NestedMeta::Meta(meta) => {
+                if meta.path().is_ident(value) {
+                    return true;
                 }
             }
-            NestedMeta::Lit(_)=>{}
+            NestedMeta::Lit(_) => {}
         }
     }
     //metas.into_iter().any(|attr| attr.path().is_ident(name));
@@ -142,7 +149,6 @@ fn contains_attribute2(metas:Vec<NestedMeta>, value: &str) -> bool {
 
 #[proc_macro_attribute]
 pub fn init(attr: TokenStream, item: TokenStream) -> TokenStream {
-
     let attrs = parse_macro_input!(attr as AttributeArgs);
     let contract = get_attribute(attrs.clone(), "contract").unwrap().unwrap();
     //let pay = contains_attribute2(attrs.clone(), "payable");
@@ -151,7 +157,7 @@ pub fn init(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut function_args = vec![];
     let amount_ident = format_ident!("amount");
 
-    if contains_attribute2(attrs.clone(), "payable"){
+    if contains_attribute2(attrs.clone(), "payable") {
         function_args.push(quote!(#amount_ident));
     } else {
         setup_function_args.extend(quote! {
@@ -161,16 +167,17 @@ pub fn init(attr: TokenStream, item: TokenStream) -> TokenStream {
         });
     };
 
-
     let ast = parse_macro_input!(item as Item);
-    let init_function_name = format_ident!("init_{}",contract.value());
-    let init_name = format!("init_{}",contract.value());
+    let init_function_name = format_ident!("init_{}", contract.value());
+    let init_name = format!("init_{}", contract.value());
     //let mut  output = proc_macro2::TokenStream::new();
 
-    let function_name = if let syn::Item::Fn(itemfn) =ast.clone(){
+    let function_name = if let syn::Item::Fn(itemfn) = ast.clone() {
         itemfn.sig.ident
-    }else{
-        return syn::Error::new(Span::call_site(), format!("#[init] must be function.")).into_compile_error().into()
+    } else {
+        return syn::Error::new(Span::call_site(), format!("#[init] must be function."))
+            .into_compile_error()
+            .into();
     };
     let output = quote! {
         #ast
@@ -199,7 +206,6 @@ pub fn init(attr: TokenStream, item: TokenStream) -> TokenStream {
 
 #[proc_macro_attribute]
 pub fn call(attr: TokenStream, item: TokenStream) -> TokenStream {
-
     let attrs = parse_macro_input!(attr as AttributeArgs);
     //let contract = get_attribute(attrs.clone(), "contract").unwrap().unwrap();
     //let function = get_attribute(attrs.clone(), "function").unwrap().unwrap();
@@ -209,7 +215,7 @@ pub fn call(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut function_args = vec![];
     let amount_ident = format_ident!("amount");
 
-    if contains_attribute2(attrs.clone(), "payable"){
+    if contains_attribute2(attrs.clone(), "payable") {
         function_args.push(quote!(#amount_ident));
     } else {
         setup_function_args.extend(quote! {
@@ -219,16 +225,17 @@ pub fn call(attr: TokenStream, item: TokenStream) -> TokenStream {
         });
     };
 
-
     let ast = parse_macro_input!(item as Item);
     //let call_function_name = format_ident!("call_{}",function.value());
-    let call_function_name = format_ident!("call_{}","abc");
+    let call_function_name = format_ident!("call_{}", "abc");
     //let mut  output = proc_macro2::TokenStream::new();
 
-    let function_name = if let syn::Item::Fn(itemfn) =ast.clone(){
+    let function_name = if let syn::Item::Fn(itemfn) = ast.clone() {
         itemfn.sig.ident
-    }else{
-        return syn::Error::new(Span::call_site(), format!("#[call] must be function.")).into_compile_error().into()
+    } else {
+        return syn::Error::new(Span::call_site(), format!("#[call] must be function."))
+            .into_compile_error()
+            .into();
     };
 
     let output = quote! {
@@ -252,7 +259,7 @@ pub fn call(attr: TokenStream, item: TokenStream) -> TokenStream {
                     return 0
                 }
             }
-            
+
         }
     };
 
@@ -260,16 +267,20 @@ pub fn call(attr: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_derive(Output)]
-pub fn output_derive(input: TokenStream) -> TokenStream{
+pub fn output_derive(input: TokenStream) -> TokenStream {
     let ast: syn::DeriveInput = syn::parse(input.clone()).unwrap();
     let enum_ident = ast.clone().ident;
     let enum_data = match &ast.data {
         syn::Data::Enum(data) => data,
-        _ => return syn::Error::new(ast.span(), "Output can only be derived for enums.").to_compile_error().into(),
+        _ => {
+            return syn::Error::new(ast.span(), "Output can only be derived for enums.")
+                .to_compile_error()
+                .into()
+        }
     };
-    let mut field_fmt= vec![];
-    let mut field_string= vec![];
-    for field in &enum_data.variants{
+    let mut field_fmt = vec![];
+    let mut field_string = vec![];
+    for field in &enum_data.variants {
         field_fmt.push(field.ident.clone());
         field_string.push(field.ident.to_string());
     }
@@ -289,28 +300,30 @@ pub fn output_derive(input: TokenStream) -> TokenStream{
     let ge = quote! {
         #display
     };
-    return ge.into()
+    return ge.into();
 }
 
 #[proc_macro_attribute]
-pub fn state(_attr:TokenStream, item:TokenStream) -> TokenStream{
+pub fn state(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut output = proc_macro2::TokenStream::new();
     let data_ident = if let Ok(ast) = syn::parse::<syn::ItemStruct>(item.clone()) {
         ast.to_tokens(&mut output);
         ast.ident
-    }else{
-         return syn::Error::new_spanned(
+    } else {
+        return syn::Error::new_spanned(
             proc_macro2::TokenStream::from(item),
             "#[state] only supports structs.",
-        ).to_compile_error().into()
+        )
+        .to_compile_error()
+        .into();
     };
-    
+
     let impl_state = quote! {
         impl #data_ident {
             fn contract_state_set(&mut self,){
                 return
             }
-    
+
             fn contract_state_get(&self){
                 return
             }
