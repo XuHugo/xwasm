@@ -11,7 +11,6 @@ use xq_derive::{call, init, Output};
 use xq_std::Context;
 
 #[derive(Serialize, Deserialize, Debug)]
-//#[state(contract="xq")]
 struct Param {
     name: String,
     age: u64,
@@ -19,7 +18,6 @@ struct Param {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-//#[state(contract="xq")]
 struct State {
     name: String,
     age: u64,
@@ -66,6 +64,7 @@ fn rcv<C: Context + Copy>(ctx: C) -> CResult<RetValue> {
         age: a.age,
         sex: a.sex,
     };
+    let num = ctx.block_number();
     //let a:Param = ctx.paramteter();
     Ok(ret)
 }
