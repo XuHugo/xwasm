@@ -65,16 +65,8 @@ pub trait ExecutorTask: Sync {
     /// Create an instance of the transaction executor.
     fn init(args: Self::Argument) -> Self;
 
-    /// Execute one single transaction given the view of the current state as a BTreeMap,
-    fn execute_transaction_btree_view(
-        &self,
-        view: &BTreeMap<<Self::T as Transaction>::Key, <Self::T as Transaction>::Value>,
-        txn: &Self::T,
-        txn_idx: usize,
-    ) -> ExecutionStatus<Self::Output, Self::Error>;
-
     /// Execute one single transaction given the view of the current state.
-    fn execute_transaction_mvhashmap_view(
+    fn execute_transaction(
         &self,
         view: &MVHashMapView<<Self::T as Transaction>::Key, <Self::T as Transaction>::Value>,
         txn: &Self::T,
