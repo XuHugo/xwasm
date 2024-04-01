@@ -1,10 +1,7 @@
+use hex::FromHex;
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 use std::{convert::TryFrom, fmt, str::FromStr};
-pub trait TransactionWrite {
-    fn extract_raw_bytes(&self) -> Option<Vec<u8>>;
-}
-use hex::FromHex;
-/// A struct that represents an account address.
+
 #[derive(Ord, PartialOrd, Eq, PartialEq, Hash, Clone, Copy)]
 pub struct AccountAddress([u8; AccountAddress::LENGTH]);
 
@@ -133,39 +130,5 @@ impl Serialize for AccountAddress {
             // See comment in deserialize.
             serializer.serialize_newtype_struct("AccountAddress", &self.0)
         }
-    }
-}
-
-#[derive(Clone, Eq, PartialEq, Hash, Serialize, Deserialize, Ord, PartialOrd)]
-pub struct AccessPath {
-    pub address: AccountAddress,
-    #[serde(with = "serde_bytes")]
-    pub path: Vec<u8>,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
-pub struct TableHandle(pub AccountAddress);
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Ord, PartialOrd, Hash)]
-pub enum StateKey {
-    AccessPath(AccessPath),
-    TableItem {
-        handle: TableHandle,
-        #[serde(with = "serde_bytes")]
-        key: Vec<u8>,
-    },
-    // Only used for testing
-    #[serde(with = "serde_bytes")]
-    Raw(Vec<u8>),
-}
-
-impl fmt::Debug for AccessPath {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "AccessPath {{ address: {:x}, path: {} }}",
-            self.address,
-            hex::encode(&self.path)
-        )
     }
 }

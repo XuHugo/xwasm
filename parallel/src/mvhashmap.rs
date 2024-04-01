@@ -1,4 +1,3 @@
-use crate::types::TransactionWrite;
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
 use std::{
@@ -9,6 +8,7 @@ use std::{
         Arc,
     },
 };
+use types::rwset::TransactionWrite;
 
 // TODO: re-use definitions with the scheduler.
 pub type TxnIndex = usize;

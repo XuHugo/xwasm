@@ -6,12 +6,11 @@ use crate::{
     scheduler::{Scheduler, SchedulerTask, TaskGuard, TxnIndex, Version},
     task::{ExecutionStatus, ExecutorTask, ModulePath, Transaction, TransactionOutput},
     txn_last_input_output::{ReadDescriptor, TxnLastInputOutput},
-    types::TransactionWrite,
 };
-
 use num_cpus;
 use once_cell::sync::Lazy;
 use std::{collections::btree_map::BTreeMap, hash::Hash, marker::PhantomData, sync::Arc};
+use types::rwset::TransactionWrite;
 
 pub static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
@@ -198,7 +197,7 @@ where
         };
 
         // VM execution.
-        let execute_result = executor.execute_transaction_mvhashmap_view(&state_view, txn);
+        let execute_result = executor.execute_transaction(&state_view, txn);
         let mut prev_modified_keys = last_input_output.modified_keys(idx_to_execute);
 
         // For tracking whether the recent execution wrote outside of the previous write/delta set.
@@ -463,7 +462,7 @@ where
         let mut ret = Vec::with_capacity(num_txns);
         for (idx, txn) in signature_verified_block.iter().enumerate() {
             // this call internally materializes deltas.
-            let res = executor.execute_transaction_btree_view(&data_map, txn, idx);
+            let res = executor.execute_transaction2(&data_map, txn, idx);
 
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
 

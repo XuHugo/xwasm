@@ -1,6 +1,6 @@
 use crate::executor::MVHashMapView;
-use crate::types::{AccessPath, StateKey, TransactionWrite};
 use std::{collections::btree_map::BTreeMap, fmt::Debug, hash::Hash};
+use types::rwset::{AccessPath, StateKey, TransactionWrite};
 
 /// The execution result of a transaction
 #[derive(Debug)]
@@ -70,6 +70,14 @@ pub trait ExecutorTask: Sync {
         &self,
         view: &MVHashMapView<<Self::T as Transaction>::Key, <Self::T as Transaction>::Value>,
         txn: &Self::T,
+    ) -> ExecutionStatus<Self::Output, Self::Error>;
+
+    /// Execute one single transaction given the view of the current state as a BTreeMap,
+    fn execute_transaction2(
+        &self,
+        view: &BTreeMap<<Self::T as Transaction>::Key, <Self::T as Transaction>::Value>,
+        txn: &Self::T,
+        txn_idx: usize,
     ) -> ExecutionStatus<Self::Output, Self::Error>;
 }
 

@@ -4,7 +4,6 @@ use crate::{
     task::{ExecutionStatus, ModulePath, Transaction, TransactionOutput},
 };
 
-use crate::types::AccessPath;
 use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
 use dashmap::DashSet;
@@ -15,6 +14,7 @@ use std::{
         Arc,
     },
 };
+use types::rwset::AccessPath;
 
 type TxnInput<K> = Vec<ReadDescriptor<K>>;
 type TxnOutput<T, E> = ExecutionStatus<T, Error<E>>;

@@ -1,18 +1,22 @@
 use crate::{
     hostfunc::host_func_init,
-    types::{Context, WasmError, WasmResult},
+    types::{Context, WasmError, WasmResult, WasmTransactionOutput},
 };
 use anyhow::anyhow;
+use parallel::task::ModulePath;
+use types::transaction::{
+    AbortInfo, ExecutionStatus, TransactionOutput as RawTransactionOutput, TransactionStatus,
+};
 use wasmtime::Val::I64;
 use wasmtime::*;
 
 // execute contract
-pub fn execute(
+pub fn execute<K: ModulePath>(
     func_name: &str,
-    context: Context,
+    context: Context<K>,
     binary: &[u8],
     amount: u64,
-) -> WasmTransactionOutput {
+) -> Result<WasmError> {
     let engine = Engine::new(Config::new().epoch_interruption(true))?;
     let module = unsafe { Module::deserialize(&engine, binary)? };
     //let module = Module::from_binary(&engine, binary)?;
@@ -43,55 +47,57 @@ pub fn execute(
     let used_gas = store.data().gas_limit - store.data().gas_counter;
     let ret = Some(r[0].clone());
 
-    if let Some(Val::I32(n)) = ret {
-        if store.data().gas_outof {
-            return Ok(WasmTransactionOutput {
-                data: "".to_string(),
-                write_set: Default::default(),
-                events: vec![],
-                gas_used: used_gas,
-                status: TransactionStatus::Keep(TxStatus::OutOfGas),
-            });
-        };
+    return Ok(WasmError::ExecuteFail);
 
-        if n == 1 {
-            Ok(WasmTransactionOutput {
-                data: store.data().output_data.clone(),
-                write_set: store.data().write_set.clone(),
-                events: store.data().event.clone(),
-                gas_used: used_gas,
-                status: TransactionStatus::Keep(TxStatus::Success),
-            })
-        } else {
-            Ok(TransactionOutput {
-                data: "".to_string(),
-                write_set: Default::default(),
-                events: vec![],
-                gas_used: used_gas,
-                status: TransactionStatus::Keep(TxStatus::MoveAbort {
-                    location: AbortLocation::Script,
-                    code: 0,
-                    info: Some(AbortInfo {
-                        reason_name: "Wasm execution fail".to_string(),
-                        description: reason.to_string(),
-                    }),
-                }),
-            })
-        }
-    } else {
-        Ok(TransactionOutput {
-            data: "".to_string(),
-            write_set: Default::default(),
-            events: vec![],
-            gas_used: used_gas,
-            status: TransactionStatus::Keep(TxStatus::MoveAbort {
-                location: AbortLocation::Script,
-                code: 0,
-                info: Some(AbortInfo {
-                    reason_name: "Wasm return error".to_string(),
-                    description: reason.to_string(),
-                }),
-            }),
-        })
-    }
+    // if let Some(Val::I32(n)) = ret {
+    //     if store.data().gas_outof {
+    //         return Ok(WasmTransactionOutput(RawTransactionOutput {
+    //             data: "".to_string(),
+    //             write_set: Default::default(),
+    //             events: vec![],
+    //             gas_used: used_gas,
+    //             status: TransactionStatus::Keep(ExecutionStatus::OutOfGas),
+    //         }));
+    //     };
+
+    //     if n == 1 {
+    //         Ok(WasmTransactionOutput(RawTransactionOutput {
+    //             data: store.data().output_data.clone(),
+    //             write_set: store.data().write_set.clone(),
+    //             events: store.data().event.clone(),
+    //             gas_used: used_gas,
+    //             status: TransactionStatus::Keep(ExecutionStatus::Success),
+    //         }))
+    //     } else {
+    //         Ok(WasmTransactionOutput(RawTransactionOutput {
+    //             data: "".to_string(),
+    //             write_set: Default::default(),
+    //             events: vec![],
+    //             gas_used: used_gas,
+    //             status: TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+    //                 location: 0,
+    //                 code: 0,
+    //                 info: Some(AbortInfo {
+    //                     reason_name: "Wasm execution fail".to_string(),
+    //                     description: "Wasm execution fail".to_string(),
+    //                 }),
+    //             }),
+    //         }))
+    //     }
+    // } else {
+    //     Ok(WasmTransactionOutput(RawTransactionOutput {
+    //         data: "".to_string(),
+    //         write_set: Default::default(),
+    //         events: vec![],
+    //         gas_used: used_gas,
+    //         status: TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+    //             location: 0,
+    //             code: 0,
+    //             info: Some(AbortInfo {
+    //                 reason_name: "Wasm return error".to_string(),
+    //                 description: "Wasm return error".to_string(),
+    //             }),
+    //         }),
+    //     }))
+    // }
 }

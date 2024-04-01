@@ -135,10 +135,10 @@ subsequent incarnation to finish.
 pub mod counters;
 pub mod errors;
 pub mod executor;
+pub mod state;
 
 pub mod mutex;
 pub mod mvhashmap;
 pub mod scheduler;
 pub mod task;
 pub mod txn_last_input_output;
-pub mod types;

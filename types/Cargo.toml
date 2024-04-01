@@ -1,6 +1,6 @@
 [package]
-name = "parallel"
-description = "parallel execution via Block-STM"
+name = "types"
+description = "types"
 version = "0.1.0"
 edition = "2018"
 
@@ -22,8 +22,7 @@ prometheus = { version = "0.13.0", default-features = false }
 serde = { version = "1.0.137", features = ["derive", "rc"] }
 serde_bytes = "0.11.6"
 hex = "0.4.3"
-
-types = { path = "../types" }
+rand = "0.7.3"
 
 [dev-dependencies]
 claims = "0.7"

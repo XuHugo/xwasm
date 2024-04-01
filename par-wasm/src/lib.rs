@@ -1,22 +1,24 @@
 mod hostfunc;
 pub mod types;
 pub mod vm;
+use parallel::{state::StateView, task::ModulePath};
+use types::{PreprocessedTransaction, WasmTransactionOutput};
+
 use crate::types::{Context, WasmResult};
 
 pub trait VM {
-    fn execute_transaction(
+    fn execute_transaction<K: ModulePath>(
         func_name: &str,
-        context: Context,
+        context: Context<K>,
         binary: &[u8],
         amount: u64,
     ) -> anyhow::Result<WasmResult>;
 
-    pub fn parallel_execute_transactions<S: StateView>(
+    fn parallel_execute_transactions<S: StateView>(
         transactions: Vec<PreprocessedTransaction>,
         state_view: &S,
         concurrency_level: usize,
-    ) -> Result<Vec<GeeTransactionOutput>, VMStatus> {
-    }
+    ) -> Result<Vec<WasmTransactionOutput>, i64>;
 }
 
 #[cfg(test)]
