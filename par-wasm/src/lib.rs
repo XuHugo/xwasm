@@ -7,9 +7,9 @@ use types::{PreprocessedTransaction, WasmTransactionOutput};
 use crate::types::{Context, WasmResult};
 
 pub trait VM {
-    fn execute_transaction<K: ModulePath>(
+    fn execute_transaction(
         func_name: &str,
-        context: Context<K>,
+        context: Context,
         binary: &[u8],
         amount: u64,
     ) -> anyhow::Result<WasmResult>;

@@ -3,7 +3,7 @@ use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 use std::{convert::TryFrom, fmt, str::FromStr};
 
 #[derive(Ord, PartialOrd, Eq, PartialEq, Hash, Clone, Copy)]
-pub struct AccountAddress([u8; AccountAddress::LENGTH]);
+pub struct AccountAddress(pub [u8; AccountAddress::LENGTH]);
 
 #[derive(Clone, Copy, Debug)]
 pub struct AccountAddressParseError;

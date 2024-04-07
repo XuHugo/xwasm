@@ -13,7 +13,7 @@ pub struct Transaction {
     pub gas_limit: u64,
     pub gas: bool,
     pub code: Vec<u8>,
-    pub param: Vec<u8>,
+    pub param: String,
     pub amount: u64,
 }
 

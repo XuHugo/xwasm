@@ -12,6 +12,7 @@ use parallel::{
 };
 use statedb::STATE_DB;
 use types::{
+    address::AccountAddress,
     rwset::{StateKey, WriteOp, WriteSet},
     transaction::{
         Transaction as RawTransaction, TransactionOutput as RawTransactionOutput, TransactionStatus,
@@ -142,39 +143,38 @@ impl std::error::Error for WasmError {}
 
 #[allow(dead_code)]
 //#[derive(Default)]
-pub struct Context<'a, K> {
-    pub(crate) func_name: String,
-    pub(crate) param: String,
-    pub(crate) invoker: Address,
-    pub(crate) owner: Address,
-    pub(crate) self_address: Address,
+pub struct Context<'a> {
+    pub(crate) func_name: &'a String,
+    pub(crate) param: &'a String,
+    pub(crate) invoker: AccountAddress,
+    pub(crate) owner: AccountAddress,
+    pub(crate) self_address: AccountAddress,
     pub(crate) self_balance: u64,
     pub(crate) output_data: String,
     pub(crate) event: Vec<String>,
-    pub(crate) metadata: Metadata,
+    pub(crate) metadata: &'a Metadata,
     //gas
     pub(crate) gas: bool,
     pub(crate) gas_counter: u64,
     pub(crate) gas_limit: u64,
     pub(crate) gas_outof: bool,
     //parallel
-    pub(crate) readsets: Vec<ReadDescriptor<K>>,
     pub(crate) writesets: WriteSet,
     pub(crate) mvhashview: &'a MVHashMapView<'a, StateKey, WriteOp>,
 }
 
-impl<'a, K: ModulePath> Context<'a, K> {
+impl<'a> Context<'a> {
     // pub fn new() -> Self {
     //     Default::default()
     // }
     pub fn init(
-        func_name: String,
-        param: String,
-        invoker: Address,
-        owner: Address,
-        self_address: Address,
+        func_name: &'a String,
+        param: &'a String,
+        invoker: AccountAddress,
+        owner: AccountAddress,
+        self_address: AccountAddress,
         self_balance: u64,
-        metadata: Metadata,
+        metadata: &'a Metadata,
         gas: bool,
         gas_limit: u64,
         mvhashview: &'a MVHashMapView<StateKey, WriteOp>,
@@ -195,14 +195,22 @@ impl<'a, K: ModulePath> Context<'a, K> {
             gas_limit,
             gas_outof: false,
 
-            readsets: vec![],
             writesets: Default::default(),
             mvhashview,
         }
     }
 }
 
-pub struct PreprocessedTransaction(RawTransaction);
+pub struct PreprocessedTransaction {
+    pub txn: RawTransaction,
+
+    pub owner: AccountAddress,
+    pub self_address: AccountAddress,
+    pub self_balance: u64,
+    pub metadata: Metadata,
+    pub gas: bool,
+    pub gas_limit: u64,
+}
 
 impl Transaction for PreprocessedTransaction {
     type Key = StateKey;
@@ -267,35 +275,28 @@ impl<'a, S: 'a + StateView> ExecutorTask for WasmExecutorTask<'a, S> {
         &self,
         view: &MVHashMapView<StateKey, WriteOp>,
         txn: &PreprocessedTransaction,
-    ) -> ExecutionStatus<WasmTransactionOutput, i64> {
-        // let context: Context<StateKey> = Context::init(
-        //     txn.get,
-        //     &txn.contract_name,
-        //     &txn.func_name,
-        //     &txn.param,
-        //     concordium_contracts_common::Amount {
-        //         micro_gtu: txn.balance,
-        //     },
-        //     txn.sender,
-        //     txn.owner,
-        //     txn.dest,
-        //     txn.gas_limit,
-        //     txn.gas,
-        //     view,
-        //     &txn.state,
-        //     txn.store.clone(),
-        //     txn.ledger_seq,
-        //     txn.ledger_timestamp,
-        //     txn.tx_hash.clone(),
-        //     txn.subcall.clone(),
-        // );
+    ) -> ExecutionStatus<Self::Output, Self::Error> {
+        let context: Context = Context::init(
+            &txn.txn.func_name,
+            &txn.txn.param,
+            txn.txn.sender,
+            txn.owner,
+            txn.self_address,
+            txn.self_balance,
+            &txn.metadata,
+            txn.gas,
+            txn.gas_limit,
+            view,
+        );
         // let func_name = match txn.kind {
         //     ExecKind::Init => format!("init_{}", &txn.contract_name),
         //     ExecKind::Call => format!("{}.{}", &txn.contract_name, &txn.func_name),
         // };
 
-        //ExecutionStatus::Success(execute(&func_name, context, &txn.code, 0))
-        todo!()
+        match execute(&txn.txn.func_name, context, &txn.txn.code, txn.txn.amount) {
+            Ok(output) => ExecutionStatus::Success(output),
+            Err(_e) => ExecutionStatus::Abort(0),
+        }
     }
 
     fn execute_transaction2(
@@ -314,9 +315,9 @@ impl<'a, S: 'a + StateView> ExecutorTask for WasmExecutorTask<'a, S> {
 pub struct WasmtimeRuntime;
 
 impl VM for WasmtimeRuntime {
-    fn execute_transaction<K: ModulePath>(
+    fn execute_transaction(
         func_name: &str,
-        context: Context<K>,
+        context: Context,
         binary: &[u8],
         amount: u64,
     ) -> anyhow::Result<WasmResult> {
