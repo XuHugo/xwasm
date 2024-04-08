@@ -179,6 +179,11 @@ pub struct AccessPath {
     pub path: Vec<u8>,
 }
 
+impl AccessPath {
+    pub fn new(address: AccountAddress, path: Vec<u8>) -> Self {
+        AccessPath { address, path }
+    }
+}
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 pub struct TableHandle(pub AccountAddress);
 

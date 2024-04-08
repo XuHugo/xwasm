@@ -72,11 +72,23 @@ impl fmt::LowerHex for AccountAddress {
     }
 }
 
-// impl fmt::Display for AccountAddress {
-//     fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
-//         write!(f, "{:x}", self)
-//     }
-// }
+impl AsRef<[u8]> for AccountAddress {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl From<&AccountAddress> for String {
+    fn from(addr: &AccountAddress) -> String {
+        ::hex::encode(addr.as_ref())
+    }
+}
+
+impl fmt::Display for AccountAddress {
+    fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{:x}", self)
+    }
+}
 
 impl fmt::Debug for AccountAddress {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

@@ -184,8 +184,6 @@ where
         scheduler: &'a Scheduler,
         executor: &E,
     ) -> SchedulerTask<'a> {
-        //println!("execute|{:?}|",version);
-        //print!("ET({:?})v{:?}:",std::thread::current().name(),version); //tracestm
         let (idx_to_execute, incarnation) = version;
         let txn = &signature_verified_block[idx_to_execute];
 
@@ -361,19 +359,12 @@ where
         &self,
         executor_initial_arguments: E::Argument,
         signature_verified_block: &[T],
-    ) -> Result<
-        (
-            Vec<E::Output>,
-            //OutputDeltaResolver<<T as Transaction>::Key, <T as Transaction>::Value>,
-        ),
-        E::Error,
-    > {
+    ) -> Result<(Vec<E::Output>,), E::Error> {
         assert!(self.concurrency_level > 1, "Must use sequential execution");
 
         let versioned_data_cache = MVHashMap::new();
 
         if signature_verified_block.is_empty() {
-            //return Ok((vec![], OutputDeltaResolver::new(versioned_data_cache)));
             return Ok((vec![],));
         }
 
@@ -395,17 +386,6 @@ where
             }
         });
 
-        // println!("{:?}",counters::SPECULATIVE_ABORT_COUNT.get());
-        // println!("scheduler:
-        // num_txns:{:?}, execution_idx:{:?}, validation_idx:{:?}, decrease_cnt:{:?}, num_active_tasks:{:?}, done_marker:{:?}, txn_dependency:{:?}",
-        // scheduler.num_txns,
-        // scheduler.execution_idx,
-        // scheduler.validation_idx,
-        // scheduler.decrease_cnt,
-        // scheduler.num_active_tasks,
-        // scheduler.done_marker,
-        // scheduler.txn_dependency.len());
-
         // TODO: for large block sizes and many cores, extract outputs in parallel.
         let num_txns = scheduler.num_txn_to_execute();
         let mut final_results = Vec::with_capacity(num_txns);
@@ -423,7 +403,6 @@ where
                         break;
                     }
                     ExecutionStatus::Abort(err) => {
-                        println!("--------error:{}", idx);
                         ret = Some(err);
                         break;
                     }

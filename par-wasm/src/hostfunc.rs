@@ -1,6 +1,10 @@
 use crate::types::{Address, Context, ADDRESS_SIZE, GAS_ENV_FUNC_BASE};
 use anyhow::Result;
 use parallel::task::ModulePath;
+use types::{
+    address::AccountAddress,
+    rwset::{AccessPath, StateKey, WriteOp},
+};
 use wasmtime::{Caller, Engine, Extern, Linker};
 
 // env function for wasm
@@ -212,7 +216,7 @@ pub fn host_func_init(engine: &Engine) -> Result<Linker<Context>> {
                 .get(kstart as u32 as usize..)
                 .and_then(|arr| arr.get(..klen as usize))
             {
-                Some(s) => s,
+                Some(s) => s.to_vec(),
                 None => return -107i32,
             };
 
@@ -221,14 +225,24 @@ pub fn host_func_init(engine: &Engine) -> Result<Linker<Context>> {
                 .get(vstart as u32 as usize..)
                 .and_then(|arr| arr.get(..vlen as usize))
             {
-                Some(s) => s,
+                Some(s) => s.to_vec(),
                 None => return -107i32,
             };
 
-            match caller.data().metadata.set_store(key, value) {
-                Ok(_) => (),
-                Err(_e) => return -108i32,
+            let address = String::from(&caller.data().self_address);
+            let addr = match AccountAddress::from_hex_literal(&address) {
+                Ok(addr) => addr,
+                Err(e) => return -107i32,
             };
+
+            let in_key = StateKey::AccessPath(AccessPath::new(addr, key));
+            let op = WriteOp::Modification(value);
+            let _wr = caller.data_mut().writesets.insert((in_key, op));
+
+            // match caller.data().metadata.set_store(key, value) {
+            //     Ok(_) => (),
+            //     Err(_e) => return -108i32,
+            // };
             0
         },
     )?;
@@ -248,13 +262,36 @@ pub fn host_func_init(engine: &Engine) -> Result<Linker<Context>> {
                 .get(start as u32 as usize..)
                 .and_then(|arr| arr.get(..length as usize))
             {
-                Some(s) => s,
+                Some(s) => s.to_vec(),
                 None => return -107i32,
             };
 
-            let value: Vec<u8> = match caller.data().metadata.get_store(key) {
-                Ok(k) => k,
-                Err(_e) => return -108i32,
+            let address = String::from(&caller.data().self_address);
+            let addr = match AccountAddress::from_hex_literal(&address) {
+                Ok(addr) => addr,
+                Err(e) => return -107i32,
+            };
+
+            let in_key = StateKey::AccessPath(AccessPath::new(addr, key.clone()));
+            let value = match caller.data().mvhashview.read(&in_key) {
+                parallel::executor::ReadResult::Value(v) => {
+                    let c = match v.as_ref() {
+                        WriteOp::Creation(value) => value.clone(),
+                        WriteOp::Modification(value) => value.clone(),
+                        WriteOp::Deletion => return -108i32,
+                    };
+                    c
+                }
+                parallel::executor::ReadResult::U128(_) => return -108i32,
+                parallel::executor::ReadResult::Unresolved(_) => return -108i32,
+                parallel::executor::ReadResult::None => {
+                    //todo: push to captured_reads
+                    let value: Vec<u8> = match caller.data().metadata.get_store(&key) {
+                        Ok(k) => k,
+                        Err(_e) => return -108i32,
+                    };
+                    value
+                }
             };
 
             match mem.write(caller, vstart as usize, &value.as_slice()) {
