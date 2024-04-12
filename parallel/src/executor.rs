@@ -207,17 +207,9 @@ where
                 if !prev_modified_keys.remove(&k) {
                     updates_outside = true;
                 }
-                //print!("updates({:?})|{:?}|",std::thread::current().name(),write_version); //tracestm
+
                 versioned_data_cache.add_write(&k, write_version, v);
             }
-
-            // Then, apply deltas.
-            // for (k, d) in output.get_deltas().into_iter() {
-            //     if !prev_modified_keys.remove(&k) {
-            //         updates_outside = true;
-            //     }
-            //     versioned_data_cache.add_delta(&k, idx_to_execute, d);
-            // }
         };
 
         let result = match execute_result {
@@ -264,7 +256,7 @@ where
     ) -> SchedulerTask<'a> {
         use MVHashMapError::*;
         use MVHashMapOutput::*;
-        //print!("VT({:?})v{:?}:",std::thread::current().name(),version_to_validate);
+
         let (idx_to_validate, incarnation) = version_to_validate;
         let read_set = last_input_output
             .read_set(idx_to_validate)
@@ -299,7 +291,6 @@ where
 
             scheduler.finish_abort(idx_to_validate, incarnation, guard)
         } else {
-            //println!("EV2({:?})-v{:?}-no",std::thread::current().name(),version_to_validate); //tracestm
             SchedulerTask::NoTask
         }
     }

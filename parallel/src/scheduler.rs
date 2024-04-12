@@ -277,7 +277,6 @@ impl Scheduler {
         if let Some(execution_target_idx) = min_dep {
             // Decrease the execution index as necessary to ensure resolved dependencies
             // get a chance to be re-executed.
-            //println!("mindep({:?})-v|{:?},{:?}|-nv",std::thread::current().name(),txn_idx,incarnation); //tracestm
             self.decrease_execution_idx(execution_target_idx);
         }
 
@@ -288,16 +287,13 @@ impl Scheduler {
                 // The transaction execution required revalidating all higher txns (not
                 // only itself), currently happens when incarnation writes to a new path
                 // (w.r.t. the write-set of its previous completed incarnation).
-                //println!("suffix({:?})-v|{:?},{:?}|-nv",std::thread::current().name(),txn_idx,incarnation); //tracestm
                 self.decrease_validation_idx(txn_idx);
             } else {
                 // Only transaction txn_idx requires validation. Return validation task
                 // back to the caller. No need to change active tasks (-1 +1= 0)
-                //println!("EE({:?})-v|{:?},{:?}|-nv",std::thread::current().name(),txn_idx,incarnation); //tracestm
                 return SchedulerTask::ValidationTask((txn_idx, incarnation), guard);
             }
         }
-        //println!("EE({:?})-v|{:?},{:?}|-no",std::thread::current().name(),txn_idx,incarnation); //tracestm
         SchedulerTask::NoTask
     }
 
@@ -324,7 +320,6 @@ impl Scheduler {
             // nothing to do, as another thread must have succeeded to incarnate and
             // obtain the task for re-execution.
             if let Some((new_incarnation, maybe_condvar)) = self.try_incarnate(txn_idx) {
-                //println!("EV-err({:?})-v({:?},{:?})-et",std::thread::current().name(),txn_idx,new_incarnation); //tracestm
                 return SchedulerTask::ExecutionTask(
                     (txn_idx, new_incarnation),
                     maybe_condvar,
@@ -332,7 +327,6 @@ impl Scheduler {
                 );
             }
         }
-        //println!("EV1-err({:?})-v({:?},{:?})-no",std::thread::current().name(),txn_idx,incarnation); //tracestm
         SchedulerTask::NoTask
     }
 }
@@ -344,7 +338,6 @@ impl Scheduler {
         //if self.validation_idx.fetch_min(target_idx, Ordering::SeqCst) > target_idx {
         let n = self.validation_idx.fetch_min(target_idx, Ordering::SeqCst);
         if n > target_idx {
-            //println!("de({:?})-v|{:?},{:?}|",std::thread::current().name(),n,target_idx); //tracestm
             self.decrease_cnt.fetch_add(1, Ordering::SeqCst);
         }
     }
@@ -354,7 +347,6 @@ impl Scheduler {
         //if self.execution_idx.fetch_min(target_idx, Ordering::SeqCst) > target_idx {
         let n = self.execution_idx.fetch_min(target_idx, Ordering::SeqCst);
         if n > target_idx {
-            //println!("dv({:?})-v|{:?},{:?}|",std::thread::current().name(),n,target_idx); //tracestm
             self.decrease_cnt.fetch_add(1, Ordering::SeqCst);
         }
     }
