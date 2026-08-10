@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{address::AccountAddress, rwset::WriteSet};
 use anyhow::{ensure, format_err, Error, Result};
 use serde::{Deserialize, Serialize};
@@ -12,7 +14,7 @@ pub struct Transaction {
     pub func_name: String,
     pub gas_limit: u64,
     pub gas: bool,
-    pub code: Vec<u8>,
+    pub code: Arc<[u8]>,
     pub param: String,
     pub amount: u64,
 }

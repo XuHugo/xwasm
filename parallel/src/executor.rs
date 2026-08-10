@@ -165,7 +165,7 @@ where
         );
 
         Self {
-            concurrency_level: num_cpus::get(),
+            concurrency_level,
             phantom: PhantomData,
         }
     }

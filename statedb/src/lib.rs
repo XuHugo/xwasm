@@ -1,9 +1,10 @@
 use anyhow::{bail, Result};
 use lazy_static::lazy_static;
 use parking_lot::Mutex;
-use rusty_leveldb::{LdbIterator, Options, DB};
+use rusty_leveldb::{LdbIterator, Options, WriteBatch, DB};
 use std::{
     io::{self, Write},
+    path::Path,
     sync::Arc,
 };
 
@@ -25,14 +26,26 @@ pub struct State {
     pub db: DB,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BatchOperation {
+    Put(Vec<u8>, Vec<u8>),
+    Delete(Vec<u8>),
+}
+
 #[allow(dead_code)]
 impl State {
-    fn new_mem() -> Result<Self> {
+    pub fn new_mem() -> Result<Self> {
         let db = match DB::open("statedb", rusty_leveldb::in_memory()) {
             Ok(o) => o,
             Err(e) => bail!(e.to_string()),
         };
         Ok(State { db })
+    }
+
+    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
+        let db =
+            DB::open(path, Self::opts()).map_err(|error| anyhow::anyhow!(error.to_string()))?;
+        Ok(Self { db })
     }
     fn new_db() -> Result<Self> {
         let db = match DB::open(STATE_PATH, State::opts()) {
@@ -50,6 +63,30 @@ impl State {
             Some(v) => return Ok(v),
             None => bail!("{:?}:<not found>", k),
         }
+    }
+
+    pub fn get_optional(&mut self, key: &[u8]) -> Option<Vec<u8>> {
+        self.db.get(key)
+    }
+
+    pub fn write_batch(
+        &mut self,
+        operations: impl IntoIterator<Item = BatchOperation>,
+    ) -> Result<()> {
+        let mut batch = WriteBatch::new();
+        for operation in operations {
+            match operation {
+                BatchOperation::Put(key, value) => batch.put(&key, &value),
+                BatchOperation::Delete(key) => batch.delete(&key),
+            }
+        }
+
+        if batch.count() == 0 {
+            return Ok(());
+        }
+
+        self.db.write(batch, true)?;
+        Ok(())
     }
 
     pub fn put(&mut self, k: &[u8], v: &[u8]) -> Result<()> {
@@ -131,8 +168,23 @@ impl State {
 
 #[cfg(test)]
 mod tests {
-    use crate::State;
+    use std::{
+        fs,
+        time::{SystemTime, UNIX_EPOCH},
+    };
 
+    use crate::{BatchOperation, State};
+
+    fn temp_state_path(label: &str) -> std::path::PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "xwasm-statedb-{label}-{}-{unique}",
+            std::process::id()
+        ))
+    }
     #[test]
     fn state_mem() {
         let k = vec![1, 2, 3];
@@ -147,9 +199,55 @@ mod tests {
     fn state_db() {
         let k = vec![1, 2, 3];
         let v = vec![4, 5, 6];
-        let mut state = State::new_db().unwrap();
+        let path = temp_state_path("basic");
+        let mut state = State::open(&path).unwrap();
         state.put(&k, &v).unwrap();
         let result = state.get(&k).unwrap();
         assert_eq!(result, v);
+        drop(state);
+        fs::remove_dir_all(path).unwrap();
+    }
+
+    #[test]
+    fn state_batch_applies_puts_and_deletes() {
+        let mut state = State::new_mem().unwrap();
+        let first_key = b"first".to_vec();
+        let second_key = b"second".to_vec();
+
+        state
+            .write_batch([
+                BatchOperation::Put(first_key.clone(), vec![1]),
+                BatchOperation::Put(second_key.clone(), vec![2]),
+            ])
+            .unwrap();
+        assert_eq!(state.get_optional(&first_key), Some(vec![1]));
+        assert_eq!(state.get_optional(&second_key), Some(vec![2]));
+
+        state
+            .write_batch([
+                BatchOperation::Delete(first_key.clone()),
+                BatchOperation::Put(second_key.clone(), vec![3]),
+            ])
+            .unwrap();
+        assert_eq!(state.get_optional(&first_key), None);
+        assert_eq!(state.get_optional(&second_key), Some(vec![3]));
+    }
+
+    #[test]
+    fn state_batch_survives_reopen() {
+        let path = temp_state_path("durable");
+
+        {
+            let mut state = State::open(&path).unwrap();
+            state
+                .write_batch([BatchOperation::Put(b"durable".to_vec(), vec![7])])
+                .unwrap();
+        }
+        {
+            let mut state = State::open(&path).unwrap();
+            assert_eq!(state.get_optional(b"durable"), Some(vec![7]));
+        }
+
+        fs::remove_dir_all(path).unwrap();
     }
 }

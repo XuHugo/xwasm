@@ -22,3 +22,6 @@ path = "../statedb"
 [lib]
 name = "wasm"
 path = "src/lib.rs"
+
+[patch.crates-io]
+integer-encoding = { path = "../vendor/integer-encoding" }

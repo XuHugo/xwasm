@@ -1,10 +1,6 @@
-use crate::types::{Address, Context, ADDRESS_SIZE, GAS_ENV_FUNC_BASE};
+use crate::types::{Address, Context, ExecutionState, ADDRESS_SIZE, GAS_ENV_FUNC_BASE};
 use anyhow::Result;
-use parallel::task::ModulePath;
-use types::{
-    address::AccountAddress,
-    rwset::{AccessPath, StateKey, WriteOp},
-};
+use types::rwset::{AccessPath, StateKey, WriteOp};
 use wasmtime::{Caller, Engine, Extern, Linker};
 
 // env function for wasm
@@ -229,11 +225,7 @@ pub fn host_func_init(engine: &Engine) -> Result<Linker<Context>> {
                 None => return -107i32,
             };
 
-            let address = String::from(&caller.data().self_address);
-            let addr = match AccountAddress::from_hex_literal(&address) {
-                Ok(addr) => addr,
-                Err(e) => return -107i32,
-            };
+            let addr = caller.data().self_address;
 
             let in_key = StateKey::AccessPath(AccessPath::new(addr, key));
             let op = WriteOp::Modification(value);
@@ -266,31 +258,42 @@ pub fn host_func_init(engine: &Engine) -> Result<Linker<Context>> {
                 None => return -107i32,
             };
 
-            let address = String::from(&caller.data().self_address);
-            let addr = match AccountAddress::from_hex_literal(&address) {
-                Ok(addr) => addr,
-                Err(e) => return -107i32,
-            };
+            let addr = caller.data().self_address;
 
             let in_key = StateKey::AccessPath(AccessPath::new(addr, key.clone()));
-            let value = match caller.data().mvhashview.read(&in_key) {
-                parallel::executor::ReadResult::Value(v) => {
-                    let c = match v.as_ref() {
-                        WriteOp::Creation(value) => value.clone(),
-                        WriteOp::Modification(value) => value.clone(),
-                        WriteOp::Deletion => return -108i32,
-                    };
-                    c
+            let value = if let Some(op) = caller.data().writesets.get(&in_key) {
+                match op {
+                    WriteOp::Creation(value) | WriteOp::Modification(value) => value.clone(),
+                    WriteOp::Deletion => return -108i32,
                 }
-                parallel::executor::ReadResult::U128(_) => return -108i32,
-                parallel::executor::ReadResult::Unresolved(_) => return -108i32,
-                parallel::executor::ReadResult::None => {
-                    //todo: push to captured_reads
-                    let value: Vec<u8> = match caller.data().metadata.get_store(&key) {
-                        Ok(k) => k,
-                        Err(_e) => return -108i32,
-                    };
-                    value
+            } else {
+                let shared_value = match caller.data().execution_state {
+                    ExecutionState::Parallel(view) => match view.read(&in_key) {
+                        parallel::executor::ReadResult::Value(value) => match value.as_ref() {
+                            WriteOp::Creation(value) | WriteOp::Modification(value) => {
+                                Some(value.clone())
+                            }
+                            WriteOp::Deletion => return -108i32,
+                        },
+                        parallel::executor::ReadResult::U128(_) => return -108i32,
+                        parallel::executor::ReadResult::Unresolved(_) => return -108i32,
+                        parallel::executor::ReadResult::None => None,
+                    },
+                    ExecutionState::Sequential(view) => match view.get(&in_key) {
+                        Some(WriteOp::Creation(value)) | Some(WriteOp::Modification(value)) => {
+                            Some(value.clone())
+                        }
+                        Some(WriteOp::Deletion) => return -108i32,
+                        None => None,
+                    },
+                };
+
+                match shared_value {
+                    Some(value) => value,
+                    None => match caller.data().state_view.get_state_value(&in_key) {
+                        Ok(Some(value)) => value,
+                        Ok(None) | Err(_) => return -108i32,
+                    },
                 }
             };
 

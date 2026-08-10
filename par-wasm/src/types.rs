@@ -1,21 +1,19 @@
-use std::fmt::Display;
+use std::{collections::BTreeMap, fmt::Display};
 
-use crate::{
-    vm::{self, execute},
-    VM,
-};
+use crate::{vm::execute, VM};
 use parallel::{
+    errors::Error as ParallelError,
     executor::{BlockExecutor, MVHashMapView, RAYON_EXEC_POOL},
     state::StateView,
-    task::{ExecutionStatus, ExecutorTask, ModulePath, Transaction, TransactionOutput},
-    txn_last_input_output::ReadDescriptor,
+    task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput},
 };
-use statedb::STATE_DB;
+use statedb::{BatchOperation, State, STATE_DB};
 use types::{
     address::AccountAddress,
     rwset::{StateKey, WriteOp, WriteSet},
     transaction::{
-        Transaction as RawTransaction, TransactionOutput as RawTransactionOutput, TransactionStatus,
+        ExecutionStatus as RawExecutionStatus, Transaction as RawTransaction,
+        TransactionOutput as RawTransactionOutput, TransactionStatus,
     },
 };
 
@@ -141,6 +139,11 @@ impl Display for WasmError {
 
 impl std::error::Error for WasmError {}
 
+#[derive(Clone, Copy)]
+pub(crate) enum ExecutionState<'a> {
+    Parallel(&'a MVHashMapView<'a, StateKey, WriteOp>),
+    Sequential(&'a BTreeMap<StateKey, WriteOp>),
+}
 #[allow(dead_code)]
 //#[derive(Default)]
 pub struct Context<'a> {
@@ -160,14 +163,15 @@ pub struct Context<'a> {
     pub(crate) gas_outof: bool,
     //parallel
     pub(crate) writesets: WriteSet,
-    pub(crate) mvhashview: &'a MVHashMapView<'a, StateKey, WriteOp>,
+    pub(crate) state_view: &'a dyn StateView,
+    pub(crate) execution_state: ExecutionState<'a>,
 }
 
 impl<'a> Context<'a> {
     // pub fn new() -> Self {
     //     Default::default()
     // }
-    pub fn init(
+    pub(crate) fn init(
         func_name: &'a String,
         param: &'a String,
         invoker: AccountAddress,
@@ -177,7 +181,8 @@ impl<'a> Context<'a> {
         metadata: &'a Metadata,
         gas: bool,
         gas_limit: u64,
-        mvhashview: &'a MVHashMapView<StateKey, WriteOp>,
+        execution_state: ExecutionState<'a>,
+        state_view: &'a dyn StateView,
     ) -> Self {
         Context {
             func_name,
@@ -196,7 +201,8 @@ impl<'a> Context<'a> {
             gas_outof: false,
 
             writesets: Default::default(),
-            mvhashview,
+            state_view,
+            execution_state,
         }
     }
 }
@@ -230,6 +236,39 @@ impl WasmTransactionOutput {
     }
 }
 
+pub fn commit_block_outputs(
+    state: &mut State,
+    outputs: &[WasmTransactionOutput],
+) -> anyhow::Result<()> {
+    let mut merged = BTreeMap::new();
+
+    for output in outputs {
+        if !matches!(
+            output.0.status,
+            TransactionStatus::Keep(RawExecutionStatus::Success)
+        ) {
+            continue;
+        }
+
+        for (key, operation) in output.0.write_set.iter() {
+            merged.insert(key.clone(), operation.clone());
+        }
+    }
+
+    let mut operations = Vec::with_capacity(merged.len());
+    for (key, operation) in merged {
+        let encoded_key = key.to_bytes()?;
+        match operation {
+            WriteOp::Creation(value) | WriteOp::Modification(value) => {
+                operations.push(BatchOperation::Put(encoded_key, value));
+            }
+            WriteOp::Deletion => operations.push(BatchOperation::Delete(encoded_key)),
+        }
+    }
+
+    state.write_batch(operations)
+}
+
 impl TransactionOutput for WasmTransactionOutput {
     type T = PreprocessedTransaction;
 
@@ -242,7 +281,7 @@ impl TransactionOutput for WasmTransactionOutput {
     }
 
     fn get_deltas(&self) -> Vec<(StateKey, u8)> {
-        todo!()
+        Vec::new()
     }
 
     /// Execution output for transactions that comes after SkipRest signal.
@@ -286,7 +325,8 @@ impl<'a, S: 'a + StateView> ExecutorTask for WasmExecutorTask<'a, S> {
             &txn.metadata,
             txn.gas,
             txn.gas_limit,
-            view,
+            ExecutionState::Parallel(view),
+            self._view,
         );
         // let func_name = match txn.kind {
         //     ExecKind::Init => format!("init_{}", &txn.contract_name),
@@ -306,36 +346,50 @@ impl<'a, S: 'a + StateView> ExecutorTask for WasmExecutorTask<'a, S> {
             <Self::T as Transaction>::Value,
         >,
         txn: &Self::T,
-        txn_idx: usize,
+        _txn_idx: usize,
     ) -> parallel::task::ExecutionStatus<Self::Output, Self::Error> {
-        todo!()
+        let context = Context::init(
+            &txn.txn.func_name,
+            &txn.txn.param,
+            txn.txn.sender,
+            txn.owner,
+            txn.self_address,
+            txn.self_balance,
+            &txn.metadata,
+            txn.gas,
+            txn.gas_limit,
+            ExecutionState::Sequential(view),
+            self._view,
+        );
+
+        match execute(&txn.txn.func_name, context, &txn.txn.code, txn.txn.amount) {
+            Ok(output) => ExecutionStatus::Success(output),
+            Err(_) => ExecutionStatus::Abort(0),
+        }
     }
 }
 
 pub struct WasmtimeRuntime;
 
 impl VM for WasmtimeRuntime {
-    fn execute_transaction(
-        func_name: &str,
-        context: Context,
-        binary: &[u8],
-        amount: u64,
-    ) -> anyhow::Result<WasmResult> {
-        //let ret = vm::execute(func_name, context, binary, amount);
-        //ret
-        todo!()
-    }
     fn parallel_execute_transactions<S: StateView>(
         transactions: Vec<PreprocessedTransaction>,
         state_view: &S,
         concurrency_level: usize,
     ) -> Result<Vec<WasmTransactionOutput>, i64> {
+        if concurrency_level <= 1 {
+            return Self::sequential_execute_transactions(transactions, state_view);
+        }
+
         let executor =
             BlockExecutor::<PreprocessedTransaction, WasmExecutorTask<S>>::new(concurrency_level);
-
-        let mut ret = executor
+        let ret = executor
             .execute_transactions_parallel(state_view, &transactions)
-            .map(|(results)| results.0);
+            .map(|results| results.0)
+            .map_err(|err| match err {
+                ParallelError::UserError(code) => code,
+                ParallelError::ModulePathReadWrite => -1,
+            });
 
         // Explicit async drop. Happens here because we can't currently move to
         // BlockExecutor due to the Module publishing fallback. TODO: fix after
@@ -345,10 +399,24 @@ impl VM for WasmtimeRuntime {
             drop(transactions);
         });
 
-        // match ret {
-        //     Ok(outputs) => Ok(outputs.into_iter().map(|op| op.0.output).collect()),
-        //     Err(err) => Err(err),
-        // }
-        Err(0)
+        ret
+    }
+
+    fn sequential_execute_transactions<S: StateView>(
+        transactions: Vec<PreprocessedTransaction>,
+        state_view: &S,
+    ) -> Result<Vec<WasmTransactionOutput>, i64> {
+        let executor = BlockExecutor::<PreprocessedTransaction, WasmExecutorTask<S>>::new(1);
+
+        executor
+            .execute_transactions_sequential(state_view, &transactions)
+            .map_err(|err| match err {
+                ParallelError::UserError(code) => code,
+                ParallelError::ModulePathReadWrite => -1,
+            })
+    }
+
+    fn commit_block(state: &mut State, outputs: &[WasmTransactionOutput]) -> anyhow::Result<()> {
+        commit_block_outputs(state, outputs)
     }
 }

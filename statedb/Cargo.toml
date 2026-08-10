@@ -10,3 +10,6 @@ rusty-leveldb = "0.3.6"
 lazy_static = "1.4.0"
 anyhow = "1.0.42"
 parking_lot = "0.12"
+
+[patch.crates-io]
+integer-encoding = { path = "../vendor/integer-encoding" }

@@ -200,6 +200,12 @@ pub enum StateKey {
     Raw(Vec<u8>),
 }
 
+impl StateKey {
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        bcs::to_bytes(self).map_err(|error| anyhow::anyhow!(error.to_string()))
+    }
+}
+
 impl fmt::Debug for AccessPath {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
         write!(

@@ -64,7 +64,41 @@ fn rcv<C: Context + Copy>(ctx: C) -> CResult<RetValue> {
         age: a.age,
         sex: a.sex,
     };
+    let state = serde_json::to_string(&ret).unwrap();
+    ctx.store_set("last_call".to_string(), state);
     let num = ctx.block_number();
     //let a:Param = ctx.paramteter();
     Ok(ret)
+}
+#[call(contract = "xq", function = "store")]
+fn store_by_name<C: Context + Copy>(ctx: C) -> CResult<RetValue> {
+    let a: Param = ctx.paramteter();
+    let key = a.name.clone();
+    let ret = RetValue {
+        name: a.name,
+        age: a.age,
+        sex: a.sex,
+    };
+    let state = serde_json::to_string(&ret).unwrap();
+    ctx.store_set(key, state);
+    Ok(ret)
+}
+#[call(contract = "xq", function = "increment")]
+fn increment<C: Context + Copy>(ctx: C) -> CResult<u64> {
+    let current: u64 = ctx.store_get("counter".to_string());
+    let next = current + 1;
+    ctx.store_set("counter".to_string(), next.to_string());
+    Ok(next)
+}
+#[call(contract = "xq", function = "compute")]
+fn compute<C: Context + Copy>(ctx: C) -> CResult<u64> {
+    let a: Param = ctx.paramteter();
+    let mut value = a.age ^ 0x9e37_79b9_7f4a_7c15;
+    for index in 0..a.age {
+        value = value
+            .wrapping_mul(0xbf58_476d_1ce4_e5b9)
+            .rotate_left((index & 63) as u32)
+            ^ index;
+    }
+    Ok(value)
 }
